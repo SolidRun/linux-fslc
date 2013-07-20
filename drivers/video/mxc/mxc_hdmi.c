@@ -162,6 +162,7 @@ struct mxc_hdmi {
 
 	struct hdmi_data_info hdmi_data;
 	int vic;
+	int edid_status;
 	struct mxc_edid_cfg edid_cfg;
 	u8 edid[HDMI_EDID_LEN];
 	bool fb_reg;
@@ -171,6 +172,8 @@ struct mxc_hdmi {
 	char *dft_mode_str;
 	int default_bpp;
 	u8 latest_intr_stat;
+	u8 plug_event;
+	u8 plug_mask;
 	bool irq_enabled;
 	spinlock_t irq_lock;
 	bool phy_enabled;
@@ -1581,6 +1584,10 @@ static int mxc_edid_read_internal(struct mxc_hdmi *hdmi, unsigned char *edid,
 		ret = mxc_edid_parse_ext_blk(edid + EDID_LENGTH,
 				cfg, &fbi->monspecs);
 		if (ret < 0)
+		fb_edid_add_monspecs(edid + EDID_LENGTH, &fbi->monspecs);
+		if (fbi->monspecs.modedb_len > 0)
+			hdmi->edid_cfg.hdmi_cap = false;
+		else
 			return -ENOENT;
 	}
 
@@ -1634,15 +1641,15 @@ static int mxc_hdmi_read_edid(struct mxc_hdmi *hdmi)
 			clkdis &= ~HDMI_MC_CLKDIS_HDCPCLK_DISABLE;
 			hdmi_writeb(clkdis, HDMI_MC_CLKDIS);
 		}
-
 	}
 	if (ret < 0) {
 		dev_dbg(&hdmi->pdev->dev, "read failed\n");
 		return HDMI_EDID_FAIL;
 	}
 
-	/* Save edid cfg for audio driver */
-	hdmi_set_edid_cfg(&hdmi->edid_cfg);
+	dev_info(&hdmi->pdev->dev, "%s HDMI in %s mode\n", __func__, hdmi->edid_cfg.hdmi_cap?"HDMI":"DVI");
+	hdmi->plug_event = hdmi->edid_cfg.hdmi_cap?HDMI_IH_PHY_STAT0_HPD:HDMI_DVI_IH_STAT;
+	hdmi->plug_mask = hdmi->edid_cfg.hdmi_cap?HDMI_PHY_HPD:HDMI_DVI_STAT;
 
 	if (!memcmp(edid_old, hdmi->edid, HDMI_EDID_LEN)) {
 		dev_info(&hdmi->pdev->dev, "same edid\n");
@@ -1807,20 +1814,21 @@ static void mxc_hdmi_edid_rebuild_modelist(struct mxc_hdmi *hdmi)
 		 */
 		mode = &hdmi->fbi->monspecs.modedb[i];
 
-		if (!(mode->vmode & FB_VMODE_INTERLACED) &&
-				(mxc_edid_mode_to_vic(mode) != 0)) {
+		if (hdmi->edid_cfg.hdmi_cap &&
+		    (mode->vmode & FB_VMODE_INTERLACED) &&
+		    (mxc_edid_mode_to_vic(mode) == 0))
+			continue;
 
-			dev_dbg(&hdmi->pdev->dev, "Added mode %d:", i);
-			dev_dbg(&hdmi->pdev->dev,
-				"xres = %d, yres = %d, freq = %d, vmode = %d, flag = %d\n",
-				hdmi->fbi->monspecs.modedb[i].xres,
-				hdmi->fbi->monspecs.modedb[i].yres,
-				hdmi->fbi->monspecs.modedb[i].refresh,
-				hdmi->fbi->monspecs.modedb[i].vmode,
-				hdmi->fbi->monspecs.modedb[i].flag);
+		dev_dbg(&hdmi->pdev->dev, "Added mode %d:", i);
+		dev_dbg(&hdmi->pdev->dev,
+			"xres = %d, yres = %d, freq = %d, vmode = %d, flag = %d\n",
+			hdmi->fbi->monspecs.modedb[i].xres,
+			hdmi->fbi->monspecs.modedb[i].yres,
+			hdmi->fbi->monspecs.modedb[i].refresh,
+			hdmi->fbi->monspecs.modedb[i].vmode,
+			hdmi->fbi->monspecs.modedb[i].flag);
 
-			fb_add_videomode(mode, &hdmi->fbi->modelist);
-		}
+		fb_add_videomode(mode, &hdmi->fbi->modelist);
 	}
 
 	fb_new_modelist(hdmi->fbi);
@@ -1917,18 +1925,16 @@ static void mxc_hdmi_set_mode(struct mxc_hdmi *hdmi)
 
 static void mxc_hdmi_cable_connected(struct mxc_hdmi *hdmi)
 {
-	int edid_status;
-
 	dev_dbg(&hdmi->pdev->dev, "%s\n", __func__);
 
 	hdmi->cable_plugin = true;
 
 	/* HDMI Initialization Step C */
-	edid_status = mxc_hdmi_read_edid(hdmi);
+	hdmi->edid_status = mxc_hdmi_read_edid(hdmi);
 
 	/* Read EDID again if first EDID read failed */
-	if (edid_status == HDMI_EDID_NO_MODES ||
-			edid_status == HDMI_EDID_FAIL) {
+	if (hdmi->edid_status == HDMI_EDID_NO_MODES ||
+			hdmi->edid_status == HDMI_EDID_FAIL) {
 		int retry_status;
 		dev_info(&hdmi->pdev->dev, "Read EDID again\n");
 		msleep(200);
@@ -1936,11 +1942,11 @@ static void mxc_hdmi_cable_connected(struct mxc_hdmi *hdmi)
 		/* If we get NO_MODES on the 1st and SAME on the 2nd attempt we
 		 * want NO_MODES as final result. */
 		if (retry_status != HDMI_EDID_SAME)
-			edid_status = retry_status;
+			hdmi->edid_status = retry_status;
 	}
 
 	/* HDMI Initialization Steps D, E, F */
-	switch (edid_status) {
+	switch (hdmi->edid_status) {
 	case HDMI_EDID_SUCCESS:
 		mxc_hdmi_edid_rebuild_modelist(hdmi);
 		break;
@@ -1957,6 +1963,9 @@ static void mxc_hdmi_cable_connected(struct mxc_hdmi *hdmi)
 		mxc_hdmi_default_modelist(hdmi);
 		break;
 	}
+
+	/* Save edid cfg for audio driver */
+	hdmi_set_edid_cfg(hdmi->edid_status, &hdmi->edid_cfg);
 
 	/* Setting video mode */
 	mxc_hdmi_set_mode(hdmi);
@@ -2004,58 +2013,44 @@ static void hotplug_worker(struct work_struct *work)
 	struct delayed_work *delay_work = to_delayed_work(work);
 	struct mxc_hdmi *hdmi =
 		container_of(delay_work, struct mxc_hdmi, hotplug_work);
-	u32 phy_int_stat, phy_int_pol, phy_int_mask;
-	u8 val;
+	u32 hdmi_phy_stat0, hdmi_phy_pol0, hdmi_phy_mask0;
 	unsigned long flags;
 	char event_string[32];
 	char *envp[] = { event_string, NULL };
 
-	phy_int_stat = hdmi->latest_intr_stat;
-	phy_int_pol = hdmi_readb(HDMI_PHY_POL0);
+	hdmi_phy_stat0 = hdmi_readb(HDMI_PHY_STAT0);
+	hdmi_phy_pol0 = hdmi_readb(HDMI_PHY_POL0);
 
-	dev_dbg(&hdmi->pdev->dev, "phy_int_stat=0x%x, phy_int_pol=0x%x\n",
-			phy_int_stat, phy_int_pol);
+	if (hdmi->latest_intr_stat & hdmi->plug_event) {
+		/* Make HPD intr active low to capture unplug event or
+		 * active high to capture plugin event */
+		hdmi_writeb((hdmi->plug_mask & ~hdmi_phy_pol0), HDMI_PHY_POL0);
 
-	/* check cable status */
-	if (phy_int_stat & HDMI_IH_PHY_STAT0_HPD) {
-		/* cable connection changes */
-		if (phy_int_pol & HDMI_PHY_HPD) {
+		/* check cable status */
+		if (hdmi_phy_stat0 & hdmi->plug_mask) {
 			/* Plugin event */
 			dev_dbg(&hdmi->pdev->dev, "EVENT=plugin\n");
 			mxc_hdmi_cable_connected(hdmi);
-
-			/* Make HPD intr active low to capture unplug event */
-			val = hdmi_readb(HDMI_PHY_POL0);
-			val &= ~HDMI_PHY_HPD;
-			hdmi_writeb(val, HDMI_PHY_POL0);
-
-			hdmi_set_cable_state(1);
 
 			sprintf(event_string, "EVENT=plugin");
 			kobject_uevent_env(&hdmi->pdev->dev.kobj, KOBJ_CHANGE, envp);
 #ifdef CONFIG_MXC_HDMI_CEC
 			mxc_hdmi_cec_handle(0x80);
 #endif
-		} else if (!(phy_int_pol & HDMI_PHY_HPD)) {
+			hdmi_set_cable_state(1);
+		} else {
 			/* Plugout event */
 			dev_dbg(&hdmi->pdev->dev, "EVENT=plugout\n");
 			hdmi_set_cable_state(0);
 			mxc_hdmi_abort_stream();
 			mxc_hdmi_cable_disconnected(hdmi);
 
-			/* Make HPD intr active high to capture plugin event */
-			val = hdmi_readb(HDMI_PHY_POL0);
-			val |= HDMI_PHY_HPD;
-			hdmi_writeb(val, HDMI_PHY_POL0);
-
 			sprintf(event_string, "EVENT=plugout");
 			kobject_uevent_env(&hdmi->pdev->dev.kobj, KOBJ_CHANGE, envp);
 #ifdef CONFIG_MXC_HDMI_CEC
 			mxc_hdmi_cec_handle(0x100);
 #endif
-
-		} else
-			dev_dbg(&hdmi->pdev->dev, "EVENT=none?\n");
+		}
 	}
 
 	/* Lock here to ensure full powerdown sequence
@@ -2063,12 +2058,12 @@ static void hotplug_worker(struct work_struct *work)
 	spin_lock_irqsave(&hdmi->irq_lock, flags);
 
 	/* Re-enable HPD interrupts */
-	phy_int_mask = hdmi_readb(HDMI_PHY_MASK0);
-	phy_int_mask &= ~HDMI_PHY_HPD;
-	hdmi_writeb(phy_int_mask, HDMI_PHY_MASK0);
+	hdmi_phy_mask0 = hdmi_readb(HDMI_PHY_MASK0);
+	hdmi_phy_mask0 &= ~hdmi->plug_mask;
+	hdmi_writeb(hdmi_phy_mask0, HDMI_PHY_MASK0);
 
 	/* Unmute interrupts */
-	hdmi_writeb(~HDMI_IH_MUTE_PHY_STAT0_HPD, HDMI_IH_MUTE_PHY_STAT0);
+	hdmi_writeb(~hdmi->plug_event, HDMI_IH_MUTE_PHY_STAT0);
 
 	if (hdmi_readb(HDMI_IH_FC_STAT2) & HDMI_IH_FC_STAT2_OVERFLOW_MASK)
 		mxc_hdmi_clear_overflow(hdmi);
@@ -2117,8 +2112,7 @@ static irqreturn_t mxc_hdmi_hotplug(int irq, void *data)
 	 */
 	/* Capture status - used in hotplug_worker ISR */
 	intr_stat = hdmi_readb(HDMI_IH_PHY_STAT0);
-
-	if (intr_stat & HDMI_IH_PHY_STAT0_HPD) {
+	if (intr_stat & hdmi->plug_event) {
 
 		dev_dbg(&hdmi->pdev->dev, "Hotplug interrupt received\n");
 		hdmi->latest_intr_stat = intr_stat;
@@ -2126,15 +2120,15 @@ static irqreturn_t mxc_hdmi_hotplug(int irq, void *data)
 		/* Mute interrupts until handled */
 
 		val = hdmi_readb(HDMI_IH_MUTE_PHY_STAT0);
-		val |= HDMI_IH_MUTE_PHY_STAT0_HPD;
+		val |= hdmi->plug_event;
 		hdmi_writeb(val, HDMI_IH_MUTE_PHY_STAT0);
 
 		val = hdmi_readb(HDMI_PHY_MASK0);
-		val |= HDMI_PHY_HPD;
+		val |= hdmi->plug_mask;
 		hdmi_writeb(val, HDMI_PHY_MASK0);
 
 		/* Clear Hotplug interrupts */
-		hdmi_writeb(HDMI_IH_PHY_STAT0_HPD, HDMI_IH_PHY_STAT0);
+		hdmi_writeb(hdmi->plug_event, HDMI_IH_PHY_STAT0);
 
 		schedule_delayed_work(&(hdmi->hotplug_work), msecs_to_jiffies(20));
 	}
@@ -2185,9 +2179,11 @@ static void mxc_hdmi_setup(struct mxc_hdmi *hdmi, unsigned long event)
 	hdmi_disable_overflow_interrupts();
 
 	dev_dbg(&hdmi->pdev->dev, "CEA mode used vic=%d\n", hdmi->vic);
-	if (hdmi->edid_cfg.hdmi_cap)
+	if (hdmi->edid_cfg.hdmi_cap || !hdmi->edid_status) {
+		hdmi_set_dvi_mode(0);
 		hdmi->hdmi_data.video_mode.mDVI = false;
-	else {
+	} else {
+		hdmi_set_dvi_mode(1);
 		dev_dbg(&hdmi->pdev->dev, "CEA mode vic=%d work in DVI\n", hdmi->vic);
 		hdmi->hdmi_data.video_mode.mDVI = true;
 	}
@@ -2286,13 +2282,13 @@ static void mxc_hdmi_fb_registered(struct mxc_hdmi *hdmi)
 		    HDMI_PHY_I2CM_CTLINT_ADDR);
 
 	/* enable cable hot plug irq */
-	hdmi_writeb((u8)~HDMI_PHY_HPD, HDMI_PHY_MASK0);
+	hdmi_writeb(~hdmi->plug_mask, HDMI_PHY_MASK0);
 
 	/* Clear Hotplug interrupts */
-	hdmi_writeb(HDMI_IH_PHY_STAT0_HPD, HDMI_IH_PHY_STAT0);
+	hdmi_writeb(hdmi->plug_event, HDMI_IH_PHY_STAT0);
 
 	/* Unmute interrupts */
-	hdmi_writeb(~HDMI_IH_MUTE_PHY_STAT0_HPD, HDMI_IH_MUTE_PHY_STAT0);
+	hdmi_writeb(~hdmi->plug_event, HDMI_IH_MUTE_PHY_STAT0);
 
 	hdmi->fb_reg = true;
 
@@ -2336,10 +2332,17 @@ static int mxc_hdmi_fb_event(struct notifier_block *nb,
 
 			hdmi->blank = *((int *)event->data);
 
+			/* Re-enable HPD interrupts */
+			val = hdmi_readb(HDMI_PHY_MASK0);
+			val &= ~hdmi->plug_mask;
+			hdmi_writeb(val, HDMI_PHY_MASK0);
+
+			/* Unmute interrupts */
+			hdmi_writeb(~hdmi->plug_event, HDMI_IH_MUTE_PHY_STAT0);
+
 			if (hdmi->fb_reg && hdmi->cable_plugin)
 				mxc_hdmi_setup(hdmi, val);
 			hdmi_set_blank_state(1);
-
 		} else if (*((int *)event->data) != hdmi->blank) {
 			dev_dbg(&hdmi->pdev->dev,
 				"event=FB_EVENT_BLANK - BLANK\n");
@@ -2347,6 +2350,20 @@ static int mxc_hdmi_fb_event(struct notifier_block *nb,
 			mxc_hdmi_abort_stream();
 
 			mxc_hdmi_phy_disable(hdmi);
+
+			if(hdmi->plug_mask == HDMI_DVI_STAT) {
+				u8 val;
+				pr_debug("In DVI Mode, disabling hotplug interrupts until unblanked\n");
+				val = hdmi_readb(HDMI_IH_MUTE_PHY_STAT0);
+				val |= hdmi->plug_event;
+				hdmi_writeb(val, HDMI_IH_MUTE_PHY_STAT0);
+
+				val = hdmi_readb(HDMI_PHY_MASK0);
+				val |= hdmi->plug_mask;
+				hdmi_writeb(val, HDMI_PHY_MASK0);
+
+				hdmi_set_dvi_mode(1);
+			}
 
 			hdmi->blank = *((int *)event->data);
 		} else
@@ -2619,15 +2636,18 @@ static int mxc_hdmi_disp_init(struct mxc_dispdrv_handle *disp,
 	/* Default setting HDMI working in HDMI mode*/
 	hdmi->edid_cfg.hdmi_cap = true;
 
+	hdmi->plug_event = HDMI_DVI_IH_STAT;
+	hdmi->plug_mask = HDMI_DVI_STAT;
+
 	INIT_DELAYED_WORK(&hdmi->hotplug_work, hotplug_worker);
 	INIT_DELAYED_WORK(&hdmi->hdcp_hdp_work, hdcp_hdp_worker);
 
 	/* Configure registers related to HDMI interrupt
 	 * generation before registering IRQ. */
-	hdmi_writeb(HDMI_PHY_HPD, HDMI_PHY_POL0);
+	hdmi_writeb(hdmi->plug_mask, HDMI_PHY_POL0);
 
 	/* Clear Hotplug interrupts */
-	hdmi_writeb(HDMI_IH_PHY_STAT0_HPD, HDMI_IH_PHY_STAT0);
+	hdmi_writeb(hdmi->plug_event, HDMI_IH_PHY_STAT0);
 
 	hdmi->nb.notifier_call = mxc_hdmi_fb_event;
 	ret = fb_register_client(&hdmi->nb);
