@@ -4084,6 +4084,9 @@ static int ov5642_probe(struct i2c_client *client,
 	struct device *dev = &client->dev;
 	int retval;
 	u8 chip_id_high, chip_id_low;
+	struct reg_value *firmware_regs;
+	int i;
+	struct sensor_data *sensor = &ov5642_data;
 
 	/* ov5642 pinctrl */
 	pinctrl = devm_pinctrl_get_select_default(dev);
@@ -4135,6 +4138,13 @@ static int ov5642_probe(struct i2c_client *client,
 					(u32 *) &(ov5642_data.mclk_source));
 	if (retval) {
 		dev_err(dev, "mclk_source missing or invalid\n");
+		return retval;
+	}
+
+	retval = of_property_read_u32(dev->of_node, "ipu_id",
+					&sensor->ipu_id);
+	if (retval) {
+		dev_err(dev, "ipu_id missing or invalid\n");
 		return retval;
 	}
 

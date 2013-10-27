@@ -2001,6 +2001,7 @@ static int ov5640_probe(struct i2c_client *client,
 	struct device *dev = &client->dev;
 	int retval;
 	u8 chip_id_high, chip_id_low;
+	struct sensor_data *sensor = &ov5640_data;
 
 	/* request power down pin */
 	pwn_gpio = of_get_named_gpio(dev->of_node, "pwn-gpios", 0);
@@ -2045,6 +2046,13 @@ static int ov5640_probe(struct i2c_client *client,
 					(u32 *) &(ov5640_data.mclk_source));
 	if (retval) {
 		dev_err(dev, "mclk_source missing or invalid\n");
+		return retval;
+	}
+
+	retval = of_property_read_u32(dev->of_node, "ipu_id",
+					&sensor->ipu_id);
+	if (retval) {
+		dev_err(dev, "ipu_id missing or invalid\n");
 		return retval;
 	}
 
