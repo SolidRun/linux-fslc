@@ -730,11 +730,12 @@ gckEVENT_Destroy(
 */
 #define gcdINVALID_EVENT_PTR    ((gcsEVENT_PTR)gcvMAXUINTPTR_T)
 
-gceSTATUS
+static gceSTATUS
 gckEVENT_GetEvent(
     IN gckEVENT Event,
     IN gctBOOL Wait,
     OUT gctUINT8 * EventID,
+    IN gcsEVENT_PTR Head,
     IN gceKERNEL_WHERE Source
     )
 {
@@ -743,7 +744,7 @@ gckEVENT_GetEvent(
     gctBOOL acquired = gcvFALSE;
     gctINT32 free;
 
-    gcmkHEADER_ARG("Event=0x%x Source=%d", Event, Source);
+    gcmkHEADER_ARG("Event=0x%x Head=%p Source=%d", Event, Head, Source);
 
     while (gcvTRUE)
     {
@@ -769,6 +770,7 @@ gckEVENT_GetEvent(
                 /* Save time stamp of event. */
                 Event->queues[id].head   = gcdINVALID_EVENT_PTR;
                 Event->queues[id].stamp  = ++(Event->stamp);
+                Event->queues[id].head = Head;
                 Event->queues[id].source = Source;
 
                 gcmkONERROR(gckOS_AtomDecrement(Event->os,
@@ -1585,7 +1587,7 @@ gckEVENT_Submit(
             queue = Event->queueHead;
 
             /* Allocate an event ID. */
-            gcmkONERROR(gckEVENT_GetEvent(Event, Wait, &id, queue->source));
+            gcmkONERROR(gckEVENT_GetEvent(Event, Wait, &id, queue->head, queue->source));
 
             /* Copy event list to event ID queue. */
             Event->queues[id].head   = queue->head;
@@ -1871,9 +1873,6 @@ gckEVENT_Compose(
     gcmkVERIFY_OBJECT(Event, gcvOBJ_EVENT);
     gcmkVERIFY_ARGUMENT(Info != gcvNULL);
 
-    /* Allocate an event ID. */
-    gcmkONERROR(gckEVENT_GetEvent(Event, gcvTRUE, &id, gcvKERNEL_PIXEL));
-
     /* Get process ID. */
     gcmkONERROR(gckOS_GetProcessID(&processID));
 
@@ -1922,8 +1921,8 @@ gckEVENT_Compose(
         tempRecord->processID = processID;
     }
 
-    /* Set the event list. */
-    Event->queues[id].head = headRecord;
+    /* Allocate an event ID. */
+    gcmkONERROR(gckEVENT_GetEvent(Event, gcvTRUE, &id, headRecord, gcvKERNEL_PIXEL));
 
     /* Start composition. */
     gcmkONERROR(gckHARDWARE_Compose(
@@ -2690,7 +2689,6 @@ gckEVENT_Stop(
 
     /* Submit the current event queue. */
     gcmkONERROR(gckEVENT_Submit(Event, gcvTRUE, gcvFALSE));
-    gcmkONERROR(gckEVENT_GetEvent(Event, gcvTRUE, &id, gcvKERNEL_PIXEL));
 
     /* Allocate a record. */
     gcmkONERROR(gckEVENT_AllocateRecord(Event, gcvTRUE, &record));
@@ -2703,8 +2701,8 @@ gckEVENT_Stop(
     record->info.u.Signal.auxSignal = 0;
     record->info.u.Signal.process   = 0;
 
-    /* Append the record. */
-    Event->queues[id].head      = record;
+
+    gcmkONERROR(gckEVENT_GetEvent(Event, gcvTRUE, &id, record, gcvKERNEL_PIXEL));
 
     /* Replace last WAIT with END. */
     gcmkONERROR(gckHARDWARE_End(
