@@ -581,6 +581,9 @@ config PGTABLE_MAPPING
 	  You can check speed with zsmalloc benchmark:
 	  https://github.com/spartacus06/zsmapbench
 
+config GENERIC_EARLY_IOREMAP
+	bool
+
 config MAX_STACK_SIZE_MB
 	int "Maximum user stack size for 32-bit processes (MB)"
 	default 80
