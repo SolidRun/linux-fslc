@@ -1218,12 +1218,13 @@ clock_set:
 }
 EXPORT_SYMBOL_GPL(sdhci_set_clock);
 
-static void sdhci_set_power(struct sdhci_host *host, unsigned short power)
+static void sdhci_set_power(struct sdhci_host *host, unsigned char mode,
+			    unsigned short vdd)
 {
 	u8 pwr = 0;
 
-	if (power != (unsigned short)-1) {
-		switch (1 << power) {
+	if (mode != MMC_POWER_OFF) {
+		switch (1 << vdd) {
 		case MMC_VDD_165_195:
 			pwr = SDHCI_POWER_180;
 			break;
@@ -1249,7 +1250,7 @@ static void sdhci_set_power(struct sdhci_host *host, unsigned short power)
 		sdhci_writeb(host, 0, SDHCI_POWER_CONTROL);
 		if (host->quirks2 & SDHCI_QUIRK2_CARD_ON_NEEDS_BUS_ON)
 			sdhci_runtime_pm_bus_off(host);
-		power = 0;
+		vdd = 0;
 	} else {
 		/*
 		 * Spec says that we should clear the power reg before setting
@@ -1283,7 +1284,7 @@ static void sdhci_set_power(struct sdhci_host *host, unsigned short power)
 
 	if (host->vmmc) {
 		spin_unlock_irq(&host->lock);
-		mmc_regulator_set_ocr(host->mmc, host->vmmc, power);
+		mmc_regulator_set_ocr(host->mmc, host->vmmc, vdd);
 		spin_lock_irq(&host->lock);
 	}
 }
@@ -1466,10 +1467,7 @@ static void sdhci_do_set_ios(struct sdhci_host *host, struct mmc_ios *ios)
 		host->clock = ios->clock;
 	}
 
-	if (ios->power_mode == MMC_POWER_OFF)
-		sdhci_set_power(host, -1);
-	else
-		sdhci_set_power(host, ios->vdd);
+	sdhci_set_power(host, ios->power_mode, ios->vdd);
 
 	if (host->ops->platform_send_init_74_clocks)
 		host->ops->platform_send_init_74_clocks(host, ios->power_mode);
