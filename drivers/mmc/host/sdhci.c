@@ -1407,6 +1407,28 @@ void sdhci_set_bus_width(struct sdhci_host *host, int width)
 }
 EXPORT_SYMBOL_GPL(sdhci_set_bus_width);
 
+void sdhci_set_uhs_signaling(struct sdhci_host *host, unsigned timing)
+{
+	u16 ctrl_2;
+
+	ctrl_2 = sdhci_readw(host, SDHCI_HOST_CONTROL2);
+	/* Select Bus Speed Mode for host */
+	ctrl_2 &= ~SDHCI_CTRL_UHS_MASK;
+	if ((timing == MMC_TIMING_MMC_HS200) ||
+	    (timing == MMC_TIMING_UHS_SDR104))
+		ctrl_2 |= SDHCI_CTRL_UHS_SDR104;
+	else if (timing == MMC_TIMING_UHS_SDR12)
+		ctrl_2 |= SDHCI_CTRL_UHS_SDR12;
+	else if (timing == MMC_TIMING_UHS_SDR25)
+		ctrl_2 |= SDHCI_CTRL_UHS_SDR25;
+	else if (timing == MMC_TIMING_UHS_SDR50)
+		ctrl_2 |= SDHCI_CTRL_UHS_SDR50;
+	else if (timing == MMC_TIMING_UHS_DDR50)
+		ctrl_2 |= SDHCI_CTRL_UHS_DDR50;
+	sdhci_writew(host, ctrl_2, SDHCI_HOST_CONTROL2);
+}
+EXPORT_SYMBOL_GPL(sdhci_set_uhs_signaling);
+
 static void sdhci_do_set_ios(struct sdhci_host *host, struct mmc_ios *ios)
 {
 	unsigned long flags;
@@ -1509,7 +1531,6 @@ static void sdhci_do_set_ios(struct sdhci_host *host, struct mmc_ios *ios)
 			/* Re-enable SD Clock */
 			host->ops->set_clock(host, host->clock);
 		}
-
 
 		/* Reset SD Clock Enable */
 		clk = sdhci_readw(host, SDHCI_CLOCK_CONTROL);
