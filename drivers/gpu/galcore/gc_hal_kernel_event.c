@@ -1966,6 +1966,7 @@ gckEVENT_Interrupt(
     IN gctUINT32 Data
     )
 {
+    unsigned long flags;
     gcmkHEADER_ARG("Event=0x%x Data=0x%x", Event, Data);
 
     /* Verify the arguments. */
@@ -2001,11 +2002,13 @@ gckEVENT_Interrupt(
     }
 
     /* Combine current interrupt status with pending flags. */
+    spin_lock_irqsave(&Event->kernel->irq_lock, flags);
 #if gcdSMP
     gckOS_AtomSetMask(Event->pending, Data);
 #else
     Event->pending |= Data;
 #endif
+    spin_unlock_irqrestore(&Event->kernel->irq_lock, flags);
 
 #if gcdINTERRUPT_STATISTIC
     {
@@ -2059,15 +2062,13 @@ gckEVENT_Notify(
     gctSIGNAL signal;
     gctUINT pending = 0;
     gckKERNEL kernel = Event->kernel;
-#if !gcdSMP
-    gctBOOL suspended = gcvFALSE;
-#endif
 #if gcmIS_DEBUG(gcdDEBUG_TRACE)
     gctINT eventNumber = 0;
 #endif
     gctINT32 free;
     gckVIDMEM_NODE nodeObject;
     gcuVIDMEM_NODE_PTR node;
+    unsigned long flags;
 
     gcmkHEADER_ARG("Event=0x%x IDs=0x%x", Event, IDs);
 
@@ -2101,19 +2102,14 @@ gckEVENT_Notify(
                                        gcvINFINITE));
         acquired = gcvTRUE;
 
+        spin_lock_irqsave(&Event->kernel->irq_lock, flags);
 #if gcdSMP
         gckOS_AtomGet(Event->os, Event->pending, (gctINT32_PTR)&pending);
 #else
-        /* Suspend interrupts. */
-        gcmkONERROR(gckOS_SuspendInterruptEx(Event->os, Event->kernel->core));
-        suspended = gcvTRUE;
-
         pending = Event->pending;
-
-        /* Resume interrupts. */
-        gcmkONERROR(gckOS_ResumeInterruptEx(Event->os, Event->kernel->core));
-        suspended = gcvFALSE;
 #endif
+        spin_unlock_irqrestore(&Event->kernel->irq_lock, flags);
+
         if (pending == 0)
         {
             /* Release the mutex queue. */
@@ -2195,19 +2191,13 @@ gckEVENT_Notify(
                 pending
                 );
 
+            spin_lock_irqsave(&Event->kernel->irq_lock, flags);
 #if gcdSMP
             gckOS_AtomClearMask(Event->pending, pending);
 #else
-            /* Suspend interrupts. */
-            gcmkONERROR(gckOS_SuspendInterruptEx(Event->os, Event->kernel->core));
-            suspended = gcvTRUE;
-
             Event->pending &= ~pending;
-
-            /* Resume interrupts. */
-            gcmkONERROR(gckOS_ResumeInterruptEx(Event->os, Event->kernel->core));
-            suspended = gcvFALSE;
 #endif
+            spin_unlock_irqrestore(&Event->kernel->irq_lock, flags);
 
             /* Release the mutex queue. */
             gcmkONERROR(gckOS_ReleaseMutex(Event->os, Event->eventQueueMutex));
@@ -2248,19 +2238,13 @@ gckEVENT_Notify(
 #endif
         }
 
+        spin_lock_irqsave(&Event->kernel->irq_lock, flags);
 #if gcdSMP
         gckOS_AtomClearMask(Event->pending, mask);
 #else
-        /* Suspend interrupts. */
-        gcmkONERROR(gckOS_SuspendInterruptEx(Event->os, Event->kernel->core));
-        suspended = gcvTRUE;
-
         Event->pending &= ~mask;
-
-        /* Resume interrupts. */
-        gcmkONERROR(gckOS_ResumeInterruptEx(Event->os, Event->kernel->core));
-        suspended = gcvFALSE;
 #endif
+        spin_unlock_irqrestore(&Event->kernel->irq_lock, flags);
 
         /* Grab the event head. */
         record = queue->head;
@@ -2530,14 +2514,6 @@ OnError:
         /* Release mutex. */
         gcmkVERIFY_OK(gckOS_ReleaseMutex(Event->os, Event->eventQueueMutex));
     }
-
-#if !gcdSMP
-    if (suspended)
-    {
-        /* Resume interrupts. */
-        gcmkVERIFY_OK(gckOS_ResumeInterruptEx(Event->os, Event->kernel->core));
-    }
-#endif
 
     /* Return the status. */
     gcmkFOOTER();
