@@ -1513,6 +1513,8 @@ gckGALDEVICE_Setup_ISR(
         gcmkONERROR(gcvSTATUS_GENERIC_IO);
     }
 
+    Device->isrEnabled[Core] = 1;
+
     /* Mark ISR as initialized. */
     Device->isrInitializeds[Core] = gcvTRUE;
 
