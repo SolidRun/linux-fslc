@@ -1824,7 +1824,7 @@ gckGALDEVICE_Start(
 
         /* Switch to SUSPEND power state. */
         gcmkONERROR(gckHARDWARE_SetPowerManagementState(
-            Device->kernels[gcvCORE_MAJOR]->hardware, gcvPOWER_OFF_BROADCAST
+            Device->kernels[gcvCORE_MAJOR]->hardware, gcvPOWER_OFF_ATPOWERON
             ));
     }
 
@@ -1835,7 +1835,7 @@ gckGALDEVICE_Start(
 
         /* Switch to SUSPEND power state. */
         gcmkONERROR(gckHARDWARE_SetPowerManagementState(
-            Device->kernels[gcvCORE_2D]->hardware, gcvPOWER_OFF_BROADCAST
+            Device->kernels[gcvCORE_2D]->hardware, gcvPOWER_OFF_ATPOWERON
             ));
     }
 
@@ -1847,7 +1847,7 @@ gckGALDEVICE_Start(
 #if gcdENABLE_VG
         /* Switch to SUSPEND power state. */
         gcmkONERROR(gckVGHARDWARE_SetPowerManagementState(
-            Device->kernels[gcvCORE_VG]->vg->hardware, gcvPOWER_OFF_BROADCAST
+            Device->kernels[gcvCORE_VG]->vg->hardware, gcvPOWER_OFF_ATPOWERON
             ));
 #endif
     }
