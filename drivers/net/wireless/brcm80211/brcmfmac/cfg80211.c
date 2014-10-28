@@ -32,7 +32,7 @@
 #include "fwil_types.h"
 #include "p2p.h"
 #include "btcoex.h"
-#include "wl_cfg80211.h"
+#include "cfg80211.h"
 #include "feature.h"
 #include "fwil.h"
 #include "proto.h"
