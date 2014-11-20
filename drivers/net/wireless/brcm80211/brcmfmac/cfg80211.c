@@ -2926,7 +2926,7 @@ brcmf_update_pmklist(struct net_device *ndev,
 		     struct brcmf_cfg80211_pmk_list *pmk_list, s32 err)
 {
 	int i, j;
-	int pmkid_len;
+	u32 pmkid_len;
 
 	pmkid_len = le32_to_cpu(pmk_list->pmkids.npmkid);
 
@@ -2954,8 +2954,7 @@ brcmf_cfg80211_set_pmksa(struct wiphy *wiphy, struct net_device *ndev,
 	struct brcmf_if *ifp = netdev_priv(ndev);
 	struct pmkid_list *pmkids = &cfg->pmk_list->pmkids;
 	s32 err = 0;
-	int i;
-	int pmkid_len;
+	u32 pmkid_len, i;
 
 	brcmf_dbg(TRACE, "Enter\n");
 	if (!check_vif_up(ifp->vif))
@@ -2994,7 +2993,7 @@ brcmf_cfg80211_del_pmksa(struct wiphy *wiphy, struct net_device *ndev,
 	struct brcmf_if *ifp = netdev_priv(ndev);
 	struct pmkid_list pmkid;
 	s32 err = 0;
-	int i, pmkid_len;
+	u32 pmkid_len, i;
 
 	brcmf_dbg(TRACE, "Enter\n");
 	if (!check_vif_up(ifp->vif))
