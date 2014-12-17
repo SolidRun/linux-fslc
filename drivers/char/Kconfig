@@ -97,6 +97,18 @@ config FSL_OTP
 
 	  If unsure, it is safe to say Y.
 
+config FSL_OTP_WRITE_ENABLE
+	bool "Enable writing support of OTP pages on Freescale chips"
+	depends on FSL_OTP
+	default n
+	help
+	  If you say Y here, you will enable support for writing of the
+	  OTP pages.  This is dangerous by nature as you can only program
+	  the pages once, so only enable this option when you actually
+	  need it so as to not inadvertently clobber data.
+
+	  If unsure, say N.
+
 config PRINTER
 	tristate "Parallel printer support"
 	depends on PARPORT
