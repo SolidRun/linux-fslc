@@ -227,6 +227,8 @@ enum v4l2_int_ioctl_num {
 	vidioc_int_reset_num,
 	/* VIDIOC_INT_INIT */
 	vidioc_int_init_num,
+	/* VIDIOC_DBG_G_CHIP_IDENT */
+	vidioc_int_g_chip_ident_num,
 
 	/*
 	 *
@@ -309,5 +311,6 @@ V4L2_INT_WRAPPER_1(enum_frameintervals, struct v4l2_frmivalenum, *);
 
 V4L2_INT_WRAPPER_0(reset);
 V4L2_INT_WRAPPER_0(init);
+V4L2_INT_WRAPPER_1(g_chip_ident, int, *);
 
 #endif
