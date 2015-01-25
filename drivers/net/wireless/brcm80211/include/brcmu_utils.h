@@ -218,4 +218,8 @@ void brcmu_dbg_hex_dump(const void *data, size_t size, const char *fmt, ...)
 }
 #endif
 
+#define BRCMU_DOTREV_LEN       16
+
+char *brcmu_dotrev_str(u32 dotrev, char *buf);
+
 #endif				/* _BRCMU_UTILS_H_ */
