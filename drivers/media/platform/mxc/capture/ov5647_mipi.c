@@ -1391,6 +1391,7 @@ static int ioctl_enum_framesizes(struct v4l2_int_device *s,
 		return -EINVAL;
 
 	fsize->pixel_format = ov5647_data.pix.pixelformat;
+	fsize->type = V4L2_FRMSIZE_TYPE_DISCRETE;
 	fsize->discrete.width =
 			max(ov5647_mode_info_data[0][fsize->index].width,
 			    ov5647_mode_info_data[1][fsize->index].width);
