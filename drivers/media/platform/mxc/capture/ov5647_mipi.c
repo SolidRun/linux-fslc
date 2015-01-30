@@ -91,7 +91,7 @@ struct ov5647_mode_info {
  */
 static struct sensor_data ov5647_data;
 static int pwn_gpio = -EINVAL;
-static int pwn_active;
+static int powon_active;
 static int rst_gpio = -EINVAL;
 static int rst_active;
 
@@ -249,9 +249,9 @@ static void ov5647_standby(s32 enable)
 		return;
 
 	if (enable)
-		gpio_set_value(pwn_gpio, !pwn_active);
+		gpio_set_value(pwn_gpio, !powon_active);
 	else
-		gpio_set_value(pwn_gpio, pwn_active);
+		gpio_set_value(pwn_gpio, powon_active);
 	pr_debug("ov5647_mipi_camera_powerdown: powerdown=%x, power_gp=0x%x\n", enable, pwn_gpio);
 	msleep(2);
 }
@@ -266,10 +266,10 @@ static void ov5647_reset(void)
 
 	/* camera power dowmn */
 	if (gpio_is_valid(pwn_gpio)) {
-		gpio_set_value(pwn_gpio, 1);
+		gpio_set_value(pwn_gpio, !powon_active);
 		msleep(5);
 
-		gpio_set_value(pwn_gpio, 0);
+		gpio_set_value(pwn_gpio, powon_active);
 		msleep(5);
 	}
 
@@ -280,7 +280,7 @@ static void ov5647_reset(void)
 	msleep(5);
 
 	if (gpio_is_valid(pwn_gpio))
-		gpio_set_value(pwn_gpio, !pwn_active);
+		gpio_set_value(pwn_gpio, !powon_active);
 }
 
 static int ov5647_power_on(struct device *dev)
@@ -1613,7 +1613,9 @@ static int ov5647_probe(struct i2c_client *client,
 	/* request power down pin */
 	pwn_gpio = of_get_named_gpio_flags(dev->of_node, "pwn-gpios", 0, &flags);
 	if (gpio_is_valid(pwn_gpio)) {
-		pwn_active = !(flags & OF_GPIO_ACTIVE_LOW);
+		/* powon_active - camera power on    */
+		/* !powon_active - camera power down */
+		powon_active = !(flags & OF_GPIO_ACTIVE_LOW);
 		init = (flags & OF_GPIO_ACTIVE_LOW) ? GPIOF_OUT_INIT_HIGH : GPIOF_OUT_INIT_LOW;
 
 		retval = devm_gpio_request_one(dev, pwn_gpio, init, "ov5647_mipi_pwdn");
@@ -1626,6 +1628,8 @@ static int ov5647_probe(struct i2c_client *client,
 	/* request reset pin */
 	rst_gpio = of_get_named_gpio_flags(dev->of_node, "rst-gpios", 0, &flags);
 	if (gpio_is_valid(rst_gpio)) {
+		/* rst_active - camera reset        */
+		/* !rst_active - clear camera reset */
 		rst_active = !(flags & OF_GPIO_ACTIVE_LOW);
 		init = (flags & OF_GPIO_ACTIVE_LOW) ? GPIOF_OUT_INIT_HIGH : GPIOF_OUT_INIT_LOW;
 
