@@ -109,7 +109,7 @@ static struct reg_value ov5647_setting_30fps_960P_1280_960[] = {
 	{	0x3820	,	0x41	,	0	,	0	}	,
 	{	0x3827	,	0xec	,	0	,	0	}	,
 	{	0x370c	,	0x03	,	0	,	0	}	,
-	{	0x3612	,	0x09	,	0	,	0	}	,
+	{	0x3612	,	0x4b	,	0	,	0	}	,
 	{	0x3618	,	0x00	,	0	,	0	}	,
 	{	0x5000	,	0x06	,	0	,	0	}	,
 	{	0x5001	,	0x00	,	0	,	0	}	,
@@ -191,12 +191,10 @@ static struct reg_value ov5647_setting_30fps_960P_1280_960[] = {
 	{	0x503d	,	0xc0	,	0	,	0	}	, /* test pattern */
 	{	0x503e	,	0x11	,	0	,	0	}	, /* test pattern */
 #endif
-	{	0x3503	,	0x03	,	0	,	0	}	, /* manual AE */
 	{	0x3501	,	0x10	,	0	,	0	}	,
 	{	0x3502	,	0x80	,	0	,	0	}	,
 	{	0x350a	,	0x00	,	0	,	0	}	,
 	{	0x350b	,	0x7f	,	0	,	0	}	,
-	{	0x5001	,	0x01	,	0	,	0	}	, /* manual AWB */
 	{	0x3c00	,	0x04	,	0	,	300	}	,
 	{	0x3002	,	0xe4	,	0x01,	0	}	, /* enable all outputs */
 };
@@ -213,7 +211,7 @@ static struct reg_value ov5647_setting_30fps_720P_1280_720[] = {
 	{	0x3820	,	0x41	,	0	,	0	}	,
 	{	0x3827	,	0xec	,	0	,	0	}	,
 	{	0x370c	,	0x03	,	0	,	0	}	,
-	{	0x3612	,	0x09	,	0	,	0	}	,
+	{	0x3612	,	0x4b	,	0	,	0	}	,
 	{	0x3618	,	0x00	,	0	,	0	}	,
 	{	0x5000	,	0x06	,	0	,	0	}	,
 	{	0x5001	,	0x00	,	0	,	0	}	,
@@ -295,12 +293,10 @@ static struct reg_value ov5647_setting_30fps_720P_1280_720[] = {
 	{	0x503d	,	0xc0	,	0	,	0	}	, /* test pattern */
 	{	0x503e	,	0x11	,	0	,	0	}	, /* test pattern */
 #endif
-	{	0x3503	,	0x03	,	0	,	0	}	, /* manual AE */
 	{	0x3501	,	0x10	,	0	,	0	}	,
 	{	0x3502	,	0x80	,	0	,	0	}	,
 	{	0x350a	,	0x00	,	0	,	0	}	,
 	{	0x350b	,	0x7f	,	0	,	0	}	,
-	{	0x5001	,	0x01	,	0	,	0	}	, /* manual AWB */
 	{	0x3c00	,	0x04	,	0	,	300	}	,
 	{	0x3002	,	0xe4	,	0x01,	0	}	, /* enable all outputs */
 };
