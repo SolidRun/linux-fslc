@@ -1068,11 +1068,10 @@ static int ov5647_init_mode(enum ov5647_frame_rate frame_rate,
 	}
 
 	if (mode == ov5647_mode_INIT) {
-		pModeSetting = ov5647_setting_30fps_960P_1280_960;
-		ArySize = ARRAY_SIZE(ov5647_setting_30fps_960P_1280_960);
+		int index = (int)ov5647_data.streamcap.capturemode;
 
-		ov5647_data.pix.width = 1280;
-		ov5647_data.pix.height = 960;
+		pModeSetting = ov5647_mode_info_data[frame_rate][index].init_data_ptr;
+		ArySize = ov5647_mode_info_data[frame_rate][index].init_data_size;
 		retval = ov5647_download_firmware(pModeSetting, ArySize);
 		if (retval < 0)
 			goto err;
@@ -1702,7 +1701,38 @@ static ssize_t set_reg(struct device *dev,
 	}
 	return count;
 }
+
+/* XXX: workaround for v4l2 client except for gstreamer-imx */
+static ssize_t show_mode(struct device *dev,
+			struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "ov5647 mode = 0x%02x\n", (int)ov5647_data.streamcap.capturemode);
+}
+
+static ssize_t set_mode(struct device *dev,
+			struct device_attribute *attr,
+		       const char *buf, size_t count)
+{
+	unsigned long mode;
+
+	mode = simple_strtoul(buf, NULL, 10);
+	if ((enum ov5647_mode)mode >= ov5647_mode_MIN &&
+		(enum ov5647_mode)mode <= ov5647_mode_MAX) {
+
+		ov5647_data.streamcap.capturemode = mode;
+		ov5647_data.pix.width =
+			max(ov5647_mode_info_data[0][mode].width,
+				ov5647_mode_info_data[1][mode].width);
+		ov5647_data.pix.height =
+			max(ov5647_mode_info_data[0][mode].height,
+				ov5647_mode_info_data[1][mode].height);
+	}
+
+	return count;
+}
+
 static DEVICE_ATTR(ov5647_reg, S_IRUGO|S_IWUGO, show_reg, set_reg);
+static DEVICE_ATTR(ov5647_mode, S_IRUGO|S_IWUGO, show_mode, set_mode);
 
 /*!
  * ov5647 I2C probe function
@@ -1801,7 +1831,7 @@ static int ov5647_probe(struct i2c_client *client,
 	ov5647_data.pix.height = 960;
 	ov5647_data.streamcap.capability = V4L2_MODE_HIGHQUALITY |
 					   V4L2_CAP_TIMEPERFRAME;
-	ov5647_data.streamcap.capturemode = 0;
+	ov5647_data.streamcap.capturemode = ov5647_mode_960P_1280_960;
 	ov5647_data.streamcap.timeperframe.denominator = DEFAULT_FPS;
 	ov5647_data.streamcap.timeperframe.numerator = 1;
 
@@ -1834,6 +1864,9 @@ static int ov5647_probe(struct i2c_client *client,
 
 	if (device_create_file(dev, &dev_attr_ov5647_reg))
 		dev_err(dev, "%s: error creating ov5647_reg entry\n", __func__);
+	if (device_create_file(dev, &dev_attr_ov5647_mode))
+		dev_err(dev, "%s: error creating ov5647_mode entry\n", __func__);
+
 	pr_info("camera ov5647_mipi is found\n");
 	return retval;
 }
