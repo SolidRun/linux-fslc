@@ -812,7 +812,7 @@ static int mxc_v4l2_g_fmt(cam_data *cam, struct v4l2_format *f)
  *
  * @return  status    0 success, EINVAL failed
  */
-static int mxc_v4l2_s_fmt(cam_data *cam, struct v4l2_format *f)
+static int mxc_v4l2_s_fmt(cam_data *cam, struct v4l2_format *f, bool try_fmt)
 {
 	int retval = 0;
 	int size = 0;
@@ -932,10 +932,22 @@ static int mxc_v4l2_s_fmt(cam_data *cam, struct v4l2_format *f)
 		else
 			bytesperline = f->fmt.pix.bytesperline;
 
-		if (f->fmt.pix.sizeimage < size)
-			f->fmt.pix.sizeimage = size;
-		else
-			size = f->fmt.pix.sizeimage;
+		if (try_fmt) {
+			/* XXX: workaround for gstreamer */
+			if (f->fmt.pix.sizeimage < size ||
+					f->fmt.pix.sizeimage % size)
+				f->fmt.pix.sizeimage = size;
+			else
+				size = f->fmt.pix.sizeimage;
+
+			break;
+		}
+		else {
+			if (f->fmt.pix.sizeimage < size)
+				f->fmt.pix.sizeimage = size;
+			else
+				size = f->fmt.pix.sizeimage;
+		}
 
 		cam->v2f.fmt.pix = f->fmt.pix;
 
@@ -951,7 +963,8 @@ static int mxc_v4l2_s_fmt(cam_data *cam, struct v4l2_format *f)
 	case V4L2_BUF_TYPE_VIDEO_OVERLAY:
 		pr_debug("   type=V4L2_BUF_TYPE_VIDEO_OVERLAY\n");
 		retval = verify_preview(cam, &f->fmt.win);
-		cam->win = f->fmt.win;
+		if (!try_fmt)
+			cam->win = f->fmt.win;
 		break;
 	default:
 		retval = -EINVAL;
@@ -2087,11 +2100,16 @@ static long mxc_v4l_do_ioctl(struct file *file,
 	 * V4l2 VIDIOC_S_FMT ioctl
 	 */
 	/* XXX: workaround for gstreamer */
-	case VIDIOC_TRY_FMT:
+	case VIDIOC_TRY_FMT: {
+		struct v4l2_format *sf = arg;
+		pr_debug("   case VIDIOC_TRY_FMT\n");
+		retval = mxc_v4l2_s_fmt(cam, sf, true);
+		break;
+	}
 	case VIDIOC_S_FMT: {
 		struct v4l2_format *sf = arg;
 		pr_debug("   case VIDIOC_S_FMT\n");
-		retval = mxc_v4l2_s_fmt(cam, sf);
+		retval = mxc_v4l2_s_fmt(cam, sf, false);
 		break;
 	}
 
