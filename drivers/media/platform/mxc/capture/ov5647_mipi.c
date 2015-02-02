@@ -101,7 +101,7 @@ static int rst_active;
 static struct reg_value ov5647_setting_30fps_960P_1280_960[] = {
 	{	0x0100	,	0x00	,	0	,	0	}	,
 	{	0x0103	,	0x01	,	0	,	0	}	,
-	{	0x3034	,	0x08	,	0	,	0	}	,  /* was 0x1A */
+	{	0x3034	,	0x18	,	0	,	0	}	,  /* was 0x1A */
 	{	0x3035	,	0x21	,	0	,	0	}	,
 	{	0x3036	,	0x49	,	0	,	0	}	,
 	{	0x303c	,	0x11	,	0	,	0	}	,
@@ -203,7 +203,7 @@ static struct reg_value ov5647_setting_30fps_960P_1280_960[] = {
 static struct reg_value ov5647_setting_30fps_720P_1280_720[] = {
 	{	0x0100	,	0x00	,	0	,	0	}	,
 	{	0x0103	,	0x01	,	0	,	0	}	,
-	{	0x3034	,	0x08	,	0	,	0	}	,  /* was 0x1A */
+	{	0x3034	,	0x18	,	0	,	0	}	,  /* was 0x1A */
 	{	0x3035	,	0x41	,	0	,	0	}	,
 	{	0x3036	,	0x7b	,	0	,	0	}	,
 	{	0x303c	,	0x11	,	0	,	0	}	,
@@ -305,7 +305,7 @@ static struct reg_value ov5647_setting_30fps_720P_1280_720[] = {
 static struct reg_value ov5647_setting_30fps_1080P_1920_1080[] = {
 	{	0x0100	,	0x00	,	0	,	0	}	,
 	{	0x0103	,	0x01	,	0	,	0	}	,
-	{	0x3034	,	0x08	,	0	,	0	}	,  /* was 0x1A */
+	{	0x3034	,	0x18	,	0	,	0	}	,  /* was 0x1A */
 	{	0x3035	,	0x21	,	0	,	0	}	,
 	{	0x3036	,	0x7b	,	0	,	0	}	,
 	{	0x303c	,	0x11	,	0	,	0	}	,
@@ -407,7 +407,7 @@ static struct reg_value ov5647_setting_30fps_1080P_1920_1080[] = {
 static struct reg_value ov5647_setting_30fps_VGA_640_480[] = {
 	{	0x0100	,	0x00	,	0	,	0	}	,
 	{	0x0103	,	0x01	,	0	,	0	}	,
-	{	0x3034	,	0x08	,	0	,	0	}	,  /* was 0x1A */
+	{	0x3034	,	0x18	,	0	,	0	}	,  /* was 0x1A */
 	{	0x3035	,	0x21	,	0	,	0	}	,
 	{	0x3036	,	0x52	,	0	,	0	}	,
 	{	0x303c	,	0x11	,	0	,	0	}	,
@@ -1271,7 +1271,7 @@ static int ov5647_init_mode(enum ov5647_frame_rate frame_rate,
 	if (mode == ov5647_mode_INIT)
 		mipi_csi2_reset(mipi_csi2_info);
 
-	/* reg 0x3034 == 0x08 is 8bit mode */
+	/* reg 0x3034[3:0] == 0x8 is 8bit mode */
 	mipi_csi2_set_datatype(mipi_csi2_info, MIPI_DT_RAW8);
 
 	if (orig_mode != ov5647_mode_INIT) {
