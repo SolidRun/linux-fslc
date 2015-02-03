@@ -97,6 +97,8 @@ static int pwn_gpio = -EINVAL;
 static int powon_active;
 static int rst_gpio = -EINVAL;
 static int rst_active;
+static int led_gpio = -EINVAL;
+static int led_active;
 
 static struct reg_value ov5647_setting_30fps_960P_1280_960[] = {
 	{	0x0100	,	0x00	,	0	,	0	}	,
@@ -979,10 +981,17 @@ static void ov5647_standby(s32 enable)
 	if (!gpio_is_valid(pwn_gpio))
 		return;
 
-	if (enable)
+	if (enable) {
 		gpio_set_value(pwn_gpio, !powon_active);
-	else
+		if (gpio_is_valid(led_gpio))
+			gpio_set_value(led_gpio, !led_active);
+	}
+	else {
 		gpio_set_value(pwn_gpio, powon_active);
+		if (gpio_is_valid(led_gpio))
+			gpio_set_value(led_gpio, led_active);
+	}
+
 	pr_debug("ov5647_mipi_camera_powerdown: powerdown=%x, power_gp=0x%x\n", enable, pwn_gpio);
 	msleep(2);
 }
@@ -2367,7 +2376,7 @@ static int ov5647_probe(struct i2c_client *client,
 			const struct i2c_device_id *id)
 {
 	struct device *dev = &client->dev;
-	int retval, init;
+	int retval, init, gpio;
 	u8 chip_id_high, chip_id_low;
 	struct sensor_data *sensor = &ov5647_data;
 	enum of_gpio_flags flags;
@@ -2399,6 +2408,21 @@ static int ov5647_probe(struct i2c_client *client,
 		if (retval < 0) {
 			dev_warn(dev, "request of ov5647_mipi_reset failed");
 			rst_gpio = -EINVAL;
+		}
+	}
+
+	/* request LED(for sanity) pin */
+	gpio = of_get_named_gpio_flags(dev->of_node, "led-gpios", 0, &flags);
+	if (gpio_is_valid(gpio)) {
+		/* led_active - LED turn on    */
+		/* !led_active - LED trun off  */
+		led_active = !(flags & OF_GPIO_ACTIVE_LOW);
+		init = (flags & OF_GPIO_ACTIVE_LOW) ? GPIOF_OUT_INIT_HIGH : GPIOF_OUT_INIT_LOW;
+
+		retval = devm_gpio_request_one(dev, gpio, init, "ov5647_mipi_led");
+		if (retval < 0) {
+			dev_warn(dev, "request of led_gpio failed");
+			gpio = -EINVAL;
 		}
 	}
 
@@ -2480,6 +2504,7 @@ static int ov5647_probe(struct i2c_client *client,
 	sensor->virtual_channel = sensor->csi | (sensor->ipu_id << 1);
 	ov5647_standby(1);
 
+	led_gpio = gpio;
 	ov5647_int_device.priv = &ov5647_data;
 	retval = v4l2_int_device_register(&ov5647_int_device);
 
