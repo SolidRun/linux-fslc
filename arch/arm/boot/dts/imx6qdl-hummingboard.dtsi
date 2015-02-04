@@ -243,6 +243,7 @@
 		AVDD-supply = <&reg_3p3v>;
 		DVDD-supply = <&reg_3p3v>;
 		pwn-gpios = <&gpio2 10 GPIO_ACTIVE_HIGH>;
+		led-gpios = <&gpio6 15 GPIO_ACTIVE_HIGH>;
 		ipu_id = <0>;
 		csi_id = <1>;
 		mclk = <25000000>;
@@ -322,6 +323,7 @@
 		pinctrl_hummingboard_mipi: hummingboard_mipi {
 			fsl,pins = <
 				MX6QDL_PAD_SD4_DAT2__GPIO2_IO10 0x17059
+				MX6QDL_PAD_NANDF_CS2__GPIO6_IO15 0x13059
 			>;
 		};
 
