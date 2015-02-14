@@ -3305,11 +3305,11 @@ static int ov5647_probe(struct i2c_client *client,
 	/* i.MX6 CSI CPD convert 10 bits color data to 8 bits.  */
 	/* (see drivers/mxc/ipu3/ipu_capture.c - _ipu_csi_init) */
 	ov5647_data.pix.pixelformat = V4L2_PIX_FMT_SBGGR8;
-	ov5647_data.pix.width = 1280;
-	ov5647_data.pix.height = 960;
+	ov5647_data.pix.width = 1024;
+	ov5647_data.pix.height = 768;
 	ov5647_data.streamcap.capability = V4L2_MODE_HIGHQUALITY |
 					   V4L2_CAP_TIMEPERFRAME;
-	ov5647_data.streamcap.capturemode = ov5647_mode_960P_1280_960;
+	ov5647_data.streamcap.capturemode = ov5647_mode_XGA_1024_768;
 	ov5647_data.streamcap.timeperframe.denominator = DEFAULT_FPS;
 	ov5647_data.streamcap.timeperframe.numerator = 1;
 
