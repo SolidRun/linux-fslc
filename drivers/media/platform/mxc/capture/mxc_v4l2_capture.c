@@ -1671,7 +1671,7 @@ static int mxc_v4l_dqueue(cam_data *cam, struct v4l2_buffer *buf)
 
 	if (!wait_event_interruptible_timeout(cam->enc_queue,
 					      cam->enc_counter != 0,
-					      10 * HZ)) {
+					      50 * HZ)) {
 		pr_err("ERROR: v4l2 capture: mxc_v4l_dqueue timeout "
 			"enc_counter %x\n",
 		       cam->enc_counter);
