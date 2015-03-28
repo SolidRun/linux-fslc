@@ -2276,6 +2276,11 @@ config FB_VIRTUAL
 
 	  If unsure, say N.
 
+config FB_VIRTUAL_PHYMEM
+	tristate "Virtual Frame Buffer with contiguous physical memory regions support"
+	depends on FB
+	default n
+
 config XEN_FBDEV_FRONTEND
 	tristate "Xen virtual frame buffer support"
 	depends on FB && XEN
