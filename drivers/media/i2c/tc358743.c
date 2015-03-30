@@ -39,6 +39,7 @@
 #include <media/v4l2-dv-timings.h>
 #include <media/v4l2-device.h>
 #include <media/v4l2-ctrls.h>
+#include <media/v4l2-event.h>
 #include <media/v4l2-of.h>
 #include <media/tc358743.h>
 
@@ -1627,6 +1628,8 @@ static const struct v4l2_subdev_core_ops tc358743_core_ops = {
 	.s_register = tc358743_s_register,
 #endif
 	.interrupt_service_routine = tc358743_isr,
+	.subscribe_event = v4l2_ctrl_subdev_subscribe_event,
+	.unsubscribe_event = v4l2_event_subdev_unsubscribe,
 };
 
 static const struct v4l2_subdev_video_ops tc358743_video_ops = {
