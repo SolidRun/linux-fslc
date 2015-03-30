@@ -606,6 +606,7 @@ static void tc358743_set_pll(struct v4l2_subdev *sd)
 	struct tc358743_state *state = to_state(sd);
 	struct tc358743_platform_data *pdata = &state->pdata;
 	u16 pllctl0 = i2c_rd16(sd, PLLCTL0);
+	u16 pllctl1 = i2c_rd16(sd, PLLCTL1);
 	u16 pllctl0_new = SET_PLL_PRD(pdata->pll_prd) |
 		SET_PLL_FBD(pdata->pll_fbd);
 
@@ -613,8 +614,8 @@ static void tc358743_set_pll(struct v4l2_subdev *sd)
 
 	/* Only rewrite when needed, since rewriting triggers another format
 	 * change event. */
-	if (pllctl0 != pllctl0_new) {
-		u32 hsck = (pdata->refclk_hz * pdata->pll_prd) / pdata->pll_fbd;
+	if ((pllctl0 != pllctl0_new) || ((pllctl1 & MASK_PLL_EN) == 0)) {
+		u32 hsck = (pdata->refclk_hz * pdata->pll_fbd) / pdata->pll_prd;
 		u16 pll_frs;
 
 		if (hsck > 500000000)
