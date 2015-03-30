@@ -713,9 +713,11 @@ static unsigned tc358743_num_csi_lanes_needed(struct v4l2_subdev *sd)
 {
 	struct tc358743_state *state = to_state(sd);
 	struct v4l2_bt_timings *bt = &state->timings.bt;
+	u32 htotal = bt->width + bt->hfrontporch + bt->hsync + bt->hbackporch;
+	u32 vtotal = bt->height + bt->vfrontporch + bt->vsync + bt->vbackporch;
 	u32 bits_pr_pixel =
 		(state->mbus_fmt_code == MEDIA_BUS_FMT_UYVY8_1X16) ?  16 : 24;
-	u32 bps = bt->width * bt->height * fps(bt) * bits_pr_pixel;
+	u32 bps = htotal * vtotal * fps(bt) * bits_pr_pixel;
 
 	return DIV_ROUND_UP(bps, state->pdata.bps_pr_lane);
 }
