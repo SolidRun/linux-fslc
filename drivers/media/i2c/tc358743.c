@@ -759,6 +759,14 @@ static void tc358743_set_csi(struct v4l2_subdev *sd)
 			((lanes > 3) ? MASK_D3M_HSTXVREGEN : 0x0));
 
 	i2c_wr32(sd, TXOPTIONCNTRL, MASK_CONTCLKMODE);
+}
+
+static void tc358743_start_csi(struct v4l2_subdev *sd)
+{
+	unsigned lanes = tc358743_num_csi_lanes_needed(sd);
+
+	v4l2_dbg(3, debug, sd, "%s:\n", __func__);
+
 	i2c_wr32(sd, STARTCNTRL, MASK_START);
 	i2c_wr32(sd, CSI_START, MASK_STRT);
 
@@ -1177,6 +1185,7 @@ static long tc358743_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 		i2c_wr16(sd, CONFCTL, confctl &
 				(~(MASK_VBUFEN | MASK_ABUFEN)));
 		tc358743_set_csi(sd);
+		tc358743_start_csi(sd);
 		i2c_wr16(sd, CONFCTL, confctl |
 				(MASK_VBUFEN | MASK_ABUFEN));
 		return 0;
@@ -1505,7 +1514,11 @@ static int tc358743_g_mbus_config(struct v4l2_subdev *sd,
 
 static int tc358743_s_stream(struct v4l2_subdev *sd, int enable)
 {
+	if (enable)
+		tc358743_start_csi(sd);
 	enable_stream(sd, enable);
+	if (!enable)
+		tc358743_set_csi(sd);
 
 	return 0;
 }
