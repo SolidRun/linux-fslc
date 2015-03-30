@@ -1847,13 +1847,19 @@ static int tc358743_probe(struct i2c_client *client,
 	sd->flags |= V4L2_SUBDEV_FL_HAS_DEVNODE | V4L2_SUBDEV_FL_HAS_EVENTS;
 
 	/* i2c access */
+	if (i2c_rd16(sd, CHIPID) != 0x0000) {
+		v4l2_info(sd, "not a TC358743 on address 0x%x\n",
+			  client->addr << 1);
+		return -ENODEV;
+	}
 	/* read the interrupt mask register, it should carry the
 	 * default values, as it hasn't been touched at this point.
 	 */
 	if (i2c_rd16(sd, INTMASK) != 0x0400) {
-		v4l2_info(sd, "not a TC358743 on address 0x%x\n",
-			  client->addr << 1);
-		return -ENODEV;
+		v4l2_warn(sd, "initial interrupt mask: 0x%04x\n",
+			  i2c_rd16(sd, INTMASK));
+		i2c_wr16(sd, INTMASK, 0x0400);
+	}
 
 	tc358743_clear_interrupt_status(sd);
 
