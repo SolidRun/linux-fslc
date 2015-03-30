@@ -749,6 +749,8 @@ static void tc358743_set_csi(struct v4l2_subdev *sd)
 	i2c_wr32(sd, THS_HEADERCNT, pdata->ths_headercnt);
 	i2c_wr32(sd, TWAKEUP, pdata->twakeup);
 	i2c_wr32(sd, THS_TRAILCNT, pdata->ths_trailcnt);
+	i2c_wr32(sd, TCLK_TRAILCNT, pdata->tclk_trailcnt);
+	i2c_wr32(sd, TCLK_POSTCNT, pdata->tclk_postcnt);
 	i2c_wr32(sd, HSTXVREGCNT, pdata->hstxvregcnt);
 
 	i2c_wr32(sd, HSTXVREGEN,
