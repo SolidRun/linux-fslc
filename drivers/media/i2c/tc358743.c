@@ -29,7 +29,9 @@
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/i2c.h>
+#include <linux/clk.h>
 #include <linux/delay.h>
+#include <linux/gpio/consumer.h>
 #include <linux/videodev2.h>
 #include <linux/workqueue.h>
 #include <linux/v4l2-dv-timings.h>
@@ -84,6 +86,8 @@ struct tc358743_state {
 
 	struct v4l2_dv_timings timings;
 	u32 mbus_fmt_code;
+
+	struct gpio_desc *reset_gpio;
 };
 
 static inline struct tc358743_state *to_state(struct v4l2_subdev *sd)
@@ -1628,11 +1632,125 @@ static const struct v4l2_ctrl_config tc358743_ctrl_audio_present = {
 	.id = TC358743_CID_AUDIO_PRESENT,
 	.name = "Audio present",
 	.type = V4L2_CTRL_TYPE_BOOLEAN,
+	.min = 0,
+	.max = 1,
+	.step = 1,
 	.def = 0,
 	.flags = V4L2_CTRL_FLAG_READ_ONLY,
 };
 
 /* --------------- PROBE / REMOVE --------------- */
+
+#if CONFIG_OF
+static void tc358743_gpio_reset(struct tc358743_state *state)
+{
+	gpiod_set_value(state->reset_gpio, 0);
+	usleep_range(5000, 10000);
+	gpiod_set_value(state->reset_gpio, 1);
+	usleep_range(1000, 2000);
+	gpiod_set_value(state->reset_gpio, 0);
+	msleep(20);
+}
+
+static int tc358743_probe_of(struct tc358743_state *state)
+{
+	struct device *dev = &state->i2c_client->dev;
+	struct device_node *np = dev->of_node;
+	struct clk *refclk;
+	u32 bps_pr_lane;
+
+	refclk = devm_clk_get(dev, "refclk");
+	if (IS_ERR(refclk)) {
+		if (PTR_ERR(refclk) != -EPROBE_DEFER)
+			dev_err(dev, "failed to get refclk: %ld\n",
+				PTR_ERR(refclk));
+		return PTR_ERR(refclk);
+	}
+
+	clk_prepare_enable(refclk);
+
+	state->pdata.refclk_hz = clk_get_rate(refclk);
+	state->pdata.ddc5v_delay = DDC5V_DELAY_100MS;
+	state->pdata.enable_hdcp = false;
+	/* A FIFO level of 16 should be enough for 2-lane 720p60 at 594 MHz. */
+	state->pdata.fifo_level = 16;
+	/*
+	 * The PLL input clock is obtained by dividing refclk by pll_prd.
+	 * It must be between 6 MHz and 40 MHz, lower frequency is better.
+	 */
+	switch (state->pdata.refclk_hz) {
+	case 26000000:
+	case 27000000:
+	case 42000000:
+		state->pdata.pll_prd = state->pdata.refclk_hz / 6000000;
+		break;
+	default:
+		dev_err(dev, "unsupported refclk rate: %u Hz\n",
+			state->pdata.refclk_hz);
+		clk_disable_unprepare(refclk);
+		return -EINVAL;
+	}
+
+	/*
+	 * The CSI bps per lane must be between 62.5 Mbps and 1 Gbps.
+	 * The default is 594 Mbps for 4-lane 1080p60 or 2-lane 720p60.
+	 */
+	bps_pr_lane = 594000000U;
+	of_property_read_u32(np, "toshiba,bps-per-lane", &bps_pr_lane);
+	if (bps_pr_lane < 62500000U || bps_pr_lane > 1000000000U) {
+		dev_err(dev, "unsupported bps per lane: %u bps\n", bps_pr_lane);
+		clk_disable_unprepare(refclk);
+		return -EINVAL;
+	}
+	state->pdata.bps_pr_lane = bps_pr_lane;
+
+	/* The CSI speed per lane is refclk / pll_prd * pll_fbd */
+	state->pdata.pll_fbd = state->pdata.bps_pr_lane /
+			       state->pdata.refclk_hz * state->pdata.pll_prd;
+	bps_pr_lane = state->pdata.refclk_hz / state->pdata.pll_prd *
+		      state->pdata.pll_fbd;
+	if (bps_pr_lane != state->pdata.bps_pr_lane) {
+		dev_warn(dev, "bps per lane corrected to %u bps\n",
+			 bps_pr_lane);
+		state->pdata.bps_pr_lane = bps_pr_lane;
+	}
+
+	/* FIXME: These timings are from REF_02 for 594 Mbps per lane */
+	state->pdata.lineinitcnt = 0xe80;
+	state->pdata.lptxtimecnt = 0x003;
+	/* tclk-preparecnt: 3, tclk-zerocnt: 20 */
+	state->pdata.tclk_headercnt = 0x1403;
+	state->pdata.tclk_trailcnt = 0x00;
+	/* ths-preparecnt: 3, ths-zerocnt: 1 */
+	state->pdata.ths_headercnt = 0x0103;
+	state->pdata.twakeup = 0x4882;
+	state->pdata.tclk_postcnt = 0x008;
+	state->pdata.ths_trailcnt = 0x2;
+	state->pdata.hstxvregcnt = 0;
+
+	/* HDMI PHY */
+	state->pdata.phy_auto_rst = 0;
+	state->pdata.hdmi_det_v = 0;
+	state->pdata.h_pi_rst = 0;
+	state->pdata.v_pi_rst = 0;
+
+	state->reset_gpio = devm_gpiod_get(dev, "reset");
+	if (IS_ERR(state->reset_gpio)) {
+		dev_err(dev, "failed to get reset gpio\n");
+		clk_disable_unprepare(refclk);
+		return PTR_ERR(state->reset_gpio);
+	}
+
+	tc358743_gpio_reset(state);
+
+	return 0;
+}
+#else
+static inline int tc358743_probe_of(struct tc358743_state *state)
+{
+	return -ENODEV;
+}
+#endif
 
 static int tc358743_probe(struct i2c_client *client,
 			  const struct i2c_device_id *id)
@@ -1656,14 +1774,19 @@ static int tc358743_probe(struct i2c_client *client,
 		return -ENOMEM;
 	}
 
-	/* platform data */
-	if (!pdata) {
-		v4l_err(client, "No platform data!\n");
-		return -ENODEV;
-	}
-	state->pdata = *pdata;
-
 	state->i2c_client = client;
+
+	/* platform data */
+	if (pdata) {
+		state->pdata = *pdata;
+	} else {
+		err = tc358743_probe_of(state);
+		if (err == -ENODEV)
+			v4l_err(client, "No platform data!\n");
+		if (err)
+			return err;
+	}
+
 	sd = &state->sd;
 	v4l2_i2c_subdev_init(sd, client, &tc358743_ops);
 	sd->flags |= V4L2_SUBDEV_FL_HAS_DEVNODE | V4L2_SUBDEV_FL_HAS_EVENTS;
