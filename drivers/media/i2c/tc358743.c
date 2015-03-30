@@ -38,6 +38,7 @@
 #include <media/v4l2-dv-timings.h>
 #include <media/v4l2-device.h>
 #include <media/v4l2-ctrls.h>
+#include <media/v4l2-of.h>
 #include <media/tc358743.h>
 
 #include "tc358743_regs.h"
@@ -67,6 +68,7 @@ static const struct v4l2_dv_timings_cap tc358743_timings_cap = {
 
 struct tc358743_state {
 	struct tc358743_platform_data pdata;
+	struct v4l2_of_bus_mipi_csi2 bus;
 	struct v4l2_subdev sd;
 	struct media_pad pad;
 	struct v4l2_ctrl_handler hdl;
@@ -760,7 +762,8 @@ static void tc358743_set_csi(struct v4l2_subdev *sd)
 			((lanes > 2) ? MASK_D2M_HSTXVREGEN : 0x0) |
 			((lanes > 3) ? MASK_D3M_HSTXVREGEN : 0x0));
 
-	i2c_wr32(sd, TXOPTIONCNTRL, MASK_CONTCLKMODE);
+	i2c_wr32(sd, TXOPTIONCNTRL, (state->bus.flags &
+		 V4L2_MBUS_CSI2_CONTINUOUS_CLOCK) ? MASK_CONTCLKMODE : 0);
 }
 
 static void tc358743_start_csi(struct v4l2_subdev *sd)
@@ -1674,6 +1677,7 @@ static int tc358743_probe_of(struct tc358743_state *state)
 {
 	struct device *dev = &state->i2c_client->dev;
 	struct device_node *np = dev->of_node;
+	struct device_node *ep;
 	struct clk *refclk;
 	u32 bps_pr_lane;
 
@@ -1683,6 +1687,23 @@ static int tc358743_probe_of(struct tc358743_state *state)
 			dev_err(dev, "failed to get refclk: %ld\n",
 				PTR_ERR(refclk));
 		return PTR_ERR(refclk);
+	}
+
+	ep = of_graph_get_next_endpoint(dev->of_node, NULL);
+	if (ep) {
+		struct v4l2_of_endpoint endpoint;
+
+		v4l2_of_parse_endpoint(ep, &endpoint);
+		if (endpoint.bus_type != V4L2_MBUS_CSI2 ||
+		    endpoint.bus.mipi_csi2.num_data_lanes == 0) {
+			dev_err(dev, "missing CSI-2 properties in endpoint\n");
+			return -EINVAL;
+		}
+
+		state->bus = endpoint.bus.mipi_csi2;
+	} else {
+		dev_err(dev, "missing endpoint node\n");
+		return -EINVAL;
 	}
 
 	clk_prepare_enable(refclk);
