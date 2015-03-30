@@ -1560,10 +1560,11 @@ static int tc358743_g_edid(struct v4l2_subdev *sd,
 	if (edid->blocks == 0)
 		return -EINVAL;
 
-	if (edid->start_block + edid->blocks > 8) {
-		edid->blocks = 8;
-		return -E2BIG;
-	}
+	if (edid->start_block >= 8)
+		return -EINVAL;
+
+	if (edid->start_block + edid->blocks > 8)
+		edid->blocks = 8 - edid->start_block;
 
 	if (!edid->edid)
 		return -EINVAL;
