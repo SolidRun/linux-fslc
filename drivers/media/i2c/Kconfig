@@ -293,6 +293,18 @@ config VIDEO_SAA7191
 	  To compile this driver as a module, choose M here: the
 	  module will be called saa7191.
 
+config VIDEO_TC358743
+	tristate "Toshiba TC358743 decoder"
+	depends on VIDEO_V4L2 && I2C
+	---help---
+	  Support for the Toshiba TC358743 HDMI to MIPI CSI-2 bridge
+
+	  This is a Analog Devices Component/Graphics Digitizer
+	  with 4:1 Multiplexed HDMI Receiver.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called tc358743.
+
 config VIDEO_TVP514X
 	tristate "Texas Instruments TVP514x video decoder"
 	depends on VIDEO_V4L2 && I2C
