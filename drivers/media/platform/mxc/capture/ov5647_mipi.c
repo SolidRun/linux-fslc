@@ -95,6 +95,7 @@ struct ov5647_mode_info {
  * Maintains the information on the current state of the sesor.
  */
 static struct sensor_data ov5647_data;
+static struct additional_data ov5647_data_add;
 static int pwn_gpio = -EINVAL;
 static int powon_active;
 static int rst_gpio = -EINVAL;
@@ -2667,6 +2668,8 @@ static int ov5647_change_mode_exposure_calc(enum ov5647_frame_rate frame_rate,
 		ov5647_mode_info_data[frame_rate][mode].width;
 	ov5647_data.pix.height =
 		ov5647_mode_info_data[frame_rate][mode].height;
+	ov5647_data_add.map_sizeimage =
+		ov5647_data.pix.width * ov5647_data.pix.height * 3 / 2;
 
 	if (ov5647_data.pix.width == 0 || ov5647_data.pix.height == 0 ||
 		pModeSetting == NULL || ArySize == 0)
@@ -2789,6 +2792,8 @@ static int ov5647_change_mode_direct(enum ov5647_frame_rate frame_rate,
 		ov5647_mode_info_data[frame_rate][mode].width;
 	ov5647_data.pix.height =
 		ov5647_mode_info_data[frame_rate][mode].height;
+	ov5647_data_add.map_sizeimage =
+		ov5647_data.pix.width * ov5647_data.pix.height * 3 / 2;
 
 	if (ov5647_data.pix.width == 0 || ov5647_data.pix.height == 0 ||
 		pModeSetting == NULL || ArySize == 0)
@@ -3524,6 +3529,8 @@ static ssize_t set_mode(struct device *dev,
 		ov5647_data.pix.height =
 			max(ov5647_mode_info_data[0][mode].height,
 				ov5647_mode_info_data[1][mode].height);
+		ov5647_data_add.map_sizeimage =
+			ov5647_data.pix.width * ov5647_data.pix.height * 3 / 2;
 	}
 
 	return count;
@@ -3546,6 +3553,7 @@ static int ov5647_probe(struct i2c_client *client,
 	u8 chip_id_high, chip_id_low;
 	struct sensor_data *sensor = &ov5647_data;
 	enum of_gpio_flags flags;
+	bool extbuf;
 
 	/* request power down pin */
 	pwn_gpio = of_get_named_gpio_flags(dev->of_node, "pwn-gpios", 0, &flags);
@@ -3592,8 +3600,12 @@ static int ov5647_probe(struct i2c_client *client,
 		}
 	}
 
+	/* allocate extended video frame buffer */
+	extbuf = of_find_property(dev->of_node, "extended-buffer", NULL);
+
 	/* Set initial values for the sensor struct. */
 	memset(&ov5647_data, 0, sizeof(ov5647_data));
+	memset(&ov5647_data_add, 0, sizeof(ov5647_data_add));
 
 	sensor->mipi_camera = 1;
 	ov5647_data.sensor_clk = devm_clk_get(dev, "csi_mclk");
@@ -3647,6 +3659,15 @@ static int ov5647_probe(struct i2c_client *client,
 	ov5647_data.streamcap.capturemode = ov5647_mode_XGA_1024_768;
 	ov5647_data.streamcap.timeperframe.denominator = DEFAULT_FPS;
 	ov5647_data.streamcap.timeperframe.numerator = 1;
+
+	/* lager memory allocate for Vivante direct texture mapping API */
+	/* (VIDIOC_REQBUFS ioctl) */
+	ov5647_data_add.map_sizeimage =
+		ov5647_data.pix.width * ov5647_data.pix.height * 3 / 2; /* I420 */
+
+	if (extbuf) {
+		ov5647_data.adata = &ov5647_data_add;
+	}
 
 	ov5647_power_on(dev);
 

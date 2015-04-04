@@ -269,13 +269,23 @@ static int mxc_free_frame_buf(cam_data *cam)
 static int mxc_allocate_frame_buf(cam_data *cam, int count)
 {
 	int i;
+	u32 map_sizeimage;
+	struct sensor_data *sensor = cam->sensor->priv;
 
-	pr_debug("%s: size=%d\n", __func__, cam->v2f.fmt.pix.sizeimage);
+	if (sensor && sensor->adata) {
+		const struct additional_data *adata = sensor->adata;
+		map_sizeimage = adata->map_sizeimage;
+	}
+	else {
+		map_sizeimage = cam->v2f.fmt.pix.sizeimage;
+	}
+
+	pr_debug("%s: size=%d\n", __func__, map_sizeimage);
 
 	for (i = 0; i < count; i++) {
 		cam->frame[i].vaddress =
 		    dma_alloc_coherent(0,
-				       PAGE_ALIGN(cam->v2f.fmt.pix.sizeimage),
+				       PAGE_ALIGN(map_sizeimage),
 				       &cam->frame[i].paddress,
 				       GFP_DMA | GFP_KERNEL);
 		if (cam->frame[i].vaddress == 0) {
@@ -286,8 +296,7 @@ static int mxc_allocate_frame_buf(cam_data *cam, int count)
 		cam->frame[i].buffer.index = i;
 		cam->frame[i].buffer.flags = V4L2_BUF_FLAG_MAPPED;
 		cam->frame[i].buffer.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-		cam->frame[i].buffer.length =
-		    PAGE_ALIGN(cam->v2f.fmt.pix.sizeimage);
+		cam->frame[i].buffer.length = PAGE_ALIGN(map_sizeimage);
 		cam->frame[i].buffer.memory = V4L2_MEMORY_MMAP;
 		cam->frame[i].buffer.m.offset = cam->frame[i].paddress;
 		cam->frame[i].index = i;
