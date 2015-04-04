@@ -250,6 +250,7 @@
 		mclk_source = <0>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&pinctrl_hummingboard_mipi>;
+		extended-buffer;
 	};
 };
 
