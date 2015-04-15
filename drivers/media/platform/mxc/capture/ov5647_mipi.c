@@ -58,7 +58,8 @@ enum ov5647_mode {
 	ov5647_mode_VGA_640_480 = 3,
 	ov5647_mode_XGA_1024_768 = 4,
 	ov5647_mode_960_720 = 5,
-	ov5647_mode_MAX = 5,
+	ov5647_mode_VGA_640_480_narrow = 6,
+	ov5647_mode_MAX = 6,
 	ov5647_mode_INIT = 0xff, /*only for sensor init*/
 };
 
@@ -1249,6 +1250,8 @@ static struct reg_value ov5647_setting_30fps_VGA_640_480[] = {
 	{	0x350b	,	0x7f	,	0	,	0	}	,
 	{	0x3c00	,	0x04	,	0	,	300	}	,
 	{	0x3002	,	0xe4	,	0x01,	0	}	, /* enable all outputs */
+	{	0x3814	,	0x31	,	0	,	0	}	, /* overwrite */
+	{	0x3815	,	0x31	,	0	,	0	}	, /* overwrite */
 };
 
 static struct reg_value ov5647_setting_15fps_VGA_640_480[] = {
@@ -1413,6 +1416,8 @@ static struct reg_value ov5647_setting_15fps_VGA_640_480[] = {
 	{	0x350b	,	0x7f	,	0	,	0	}	,
 	{	0x3c00	,	0x04	,	0	,	300	}	,
 	{	0x3002	,	0xe4	,	0x01,	0	}	, /* enable all outputs */
+	{	0x3814	,	0x31	,	0	,	0	}	, /* overwrite */
+	{	0x3815	,	0x31	,	0	,	0	}	, /* overwrite */
 };
 
 static struct reg_value ov5647_setting_30fps_XGA_1024_768[] = {
@@ -2084,13 +2089,16 @@ static struct ov5647_mode_info ov5647_mode_info_data[2][ov5647_mode_MAX + 1] = {
 		ARRAY_SIZE(ov5647_setting_15fps_1080P_1920_1080)},
 		{ov5647_mode_VGA_640_480, SUBSAMPLING, 640, 480,
 		ov5647_setting_15fps_VGA_640_480,
-		ARRAY_SIZE(ov5647_setting_15fps_VGA_640_480)},
+		ARRAY_SIZE(ov5647_setting_15fps_VGA_640_480) - 2},
 		{ov5647_mode_XGA_1024_768, SUBSAMPLING, 1024, 768,
 		ov5647_setting_15fps_XGA_1024_768,
 		ARRAY_SIZE(ov5647_setting_15fps_XGA_1024_768)},
 		{ov5647_mode_960_720, SUBSAMPLING, 960, 720,
 		ov5647_setting_15fps_960_720,
 		ARRAY_SIZE(ov5647_setting_15fps_960_720)},
+		{ov5647_mode_VGA_640_480_narrow, SUBSAMPLING, 640, 480,
+		ov5647_setting_15fps_VGA_640_480,
+		ARRAY_SIZE(ov5647_setting_15fps_VGA_640_480)},
 	},
 	{
 		{ov5647_mode_960P_1280_960, SUBSAMPLING, 1280, 960,
@@ -2104,13 +2112,16 @@ static struct ov5647_mode_info ov5647_mode_info_data[2][ov5647_mode_MAX + 1] = {
 		ARRAY_SIZE(ov5647_setting_30fps_1080P_1920_1080)},
 		{ov5647_mode_VGA_640_480, SUBSAMPLING, 640, 480,
 		ov5647_setting_30fps_VGA_640_480,
-		ARRAY_SIZE(ov5647_setting_30fps_VGA_640_480)},
+		ARRAY_SIZE(ov5647_setting_30fps_VGA_640_480) - 2},
 		{ov5647_mode_XGA_1024_768, SUBSAMPLING, 1024, 768,
 		ov5647_setting_30fps_XGA_1024_768,
 		ARRAY_SIZE(ov5647_setting_30fps_XGA_1024_768)},
 		{ov5647_mode_960_720, SUBSAMPLING, 960, 720,
 		ov5647_setting_30fps_960_720,
 		ARRAY_SIZE(ov5647_setting_15fps_960_720)},
+		{ov5647_mode_VGA_640_480_narrow, SUBSAMPLING, 640, 480,
+		ov5647_setting_30fps_VGA_640_480,
+		ARRAY_SIZE(ov5647_setting_30fps_VGA_640_480)},
 	},
 };
 
