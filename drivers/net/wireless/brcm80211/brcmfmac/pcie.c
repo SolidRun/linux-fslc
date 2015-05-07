@@ -1609,7 +1609,7 @@ static void brcmf_pcie_setup(struct device *dev, const struct firmware *fw,
 		bus->msgbuf->commonrings[i] =
 				&devinfo->shared.commonrings[i]->commonring;
 
-	flowrings = kcalloc(devinfo->shared.nrof_flowrings, sizeof(flowrings),
+	flowrings = kcalloc(devinfo->shared.nrof_flowrings, sizeof(*flowrings),
 			    GFP_KERNEL);
 	if (!flowrings)
 		goto fail;
