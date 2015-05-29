@@ -127,7 +127,8 @@ void brcmf_feat_attach(struct brcmf_pub *drvr)
 	brcmf_feat_iovar_int_get(ifp, BRCMF_FEAT_PNO, "pfn");
 	if (drvr->bus_if->wowl_supported)
 		brcmf_feat_iovar_int_get(ifp, BRCMF_FEAT_WOWL, "wowl");
-	if (drvr->bus_if->chip != BRCM_CC_43362_CHIP_ID)
+	if ((drvr->bus_if->chip != BRCM_CC_43362_CHIP_ID) &&
+	    (drvr->bus_if->chip != BRCM_CC_4330_CHIP_ID))
 		brcmf_feat_iovar_int_set(ifp, BRCMF_FEAT_MBSS, "mbss", 0);
 
 	/* set chip related quirks */
