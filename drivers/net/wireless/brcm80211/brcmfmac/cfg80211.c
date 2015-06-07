@@ -6008,7 +6008,15 @@ static void brcmf_cfg80211_reg_notifier(struct wiphy *wiphy,
 	brcmf_dbg(TRACE, "enter: initiator=%d, alpha=%c%c\n", req->initiator,
 		  req->alpha2[0], req->alpha2[1]);
 
-	/* ignore non-ISO3166 country codes */
+	/* ignore non-ISO3166 country codes
+	 * don't report an error on 00 the world roaming
+	 * designator as the firmware  don't support it
+	 * but there is no reason to pass that info to userspace
+	 */
+
+	if (req->alpha2[0] == '0' && req->alpha2[1] == '0')
+		return;
+
 	for (i = 0; i < sizeof(req->alpha2); i++)
 		if (req->alpha2[i] < 'A' || req->alpha2[i] > 'Z') {
 			brcmf_err("not a ISO3166 code\n");
