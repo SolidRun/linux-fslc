@@ -495,14 +495,6 @@ _State(
 
                 /* Set index in state mapping table. */
                 Context->map[Address + i].index = (gctUINT)Index + 1 + i;
-
-#if gcdSECURE_USER
-                /* Save hint. */
-                if (Context->hint != gcvNULL)
-                {
-                    Context->hint[Address + i] = Hinted;
-                }
-#endif
             }
         }
 
@@ -531,14 +523,6 @@ _State(
 
             /* Set index in state mapping table. */
             Context->map[Address + i].index = (gctUINT)Index + i;
-
-#if gcdSECURE_USER
-            /* Save hint. */
-            if (Context->hint != gcvNULL)
-            {
-                Context->hint[Address + i] = Hinted;
-            }
-#endif
         }
     }
 
@@ -1321,13 +1305,6 @@ _DestroyContext(
             Context->buffer = next;
         }
 
-#if gcdSECURE_USER
-        /* Free the hint array. */
-        if (Context->hint != gcvNULL)
-        {
-            gcmkONERROR(gcmkOS_SAFE_FREE(Context->os, Context->hint));
-        }
-#endif
         /* Free record array copy. */
 #if REMOVE_DUPLICATED_COPY_FROM_USER
         if (Context->recordArrayMap != gcvNULL)
@@ -1499,21 +1476,6 @@ gckCONTEXT_Construct(
         gcmkONERROR(gckOS_ZeroMemory(
             context->map, gcmSIZEOF(gcsSTATE_MAP) * context->stateCount
             ));
-
-
-        /**************************************************************************/
-        /* Allocate the hint array. ***********************************************/
-
-#if gcdSECURE_USER
-        /* Allocate hints. */
-        gcmkONERROR(gckOS_Allocate(
-            Os,
-            gcmSIZEOF(gctBOOL) * context->stateCount,
-            &pointer
-            ));
-
-        context->hint = pointer;
-#endif
     }
 
     /**************************************************************************/
@@ -1794,10 +1756,6 @@ gckCONTEXT_Update(
     gctUINT index;
     gctUINT i, j;
 
-#if gcdSECURE_USER
-    gcskSECURE_CACHE_PTR cache;
-#endif
-
     gcmkHEADER_ARG(
         "Context=0x%08X ProcessID=%d StateDelta=0x%08X",
         Context, ProcessID, StateDelta
@@ -1862,11 +1820,6 @@ gckCONTEXT_Update(
     gcmkONERROR(gckOS_WaitSignal(
         Context->os, buffer->signal, gcvINFINITE
         ));
-
-#if gcdSECURE_USER
-    /* Get the cache form the database. */
-    gcmkONERROR(gckKERNEL_GetProcessDBCache(kernel, ProcessID, &cache));
-#endif
 
 #if gcmIS_DEBUG(gcdDEBUG_CODE) && 1 && gcdENABLE_3D
     /* Update current context token. */
@@ -2011,17 +1964,6 @@ gckCONTEXT_Update(
                         data = ((((gctUINT32) (data)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 4:4) - (0 ? 4:4) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 4:4) - (0 ? 4:4) + 1))))))) << (0 ? 4:4))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 4:4) - (0 ? 4:4) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 4:4) - (0 ? 4:4) + 1))))))) << (0 ? 4:4)));
                         data = ((((gctUINT32) (data)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 13:13) - (0 ? 13:13) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 13:13) - (0 ? 13:13) + 1))))))) << (0 ? 13:13))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 13:13) - (0 ? 13:13) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 13:13) - (0 ? 13:13) + 1))))))) << (0 ? 13:13)));
                     }
-
-#if gcdSECURE_USER
-                    /* Do we need to convert the logical address? */
-                    if (Context->hint[address])
-                    {
-                        /* Map handle into physical address. */
-                        gcmkONERROR(gckKERNEL_MapLogicalToPhysical(
-                            kernel, cache, (gctPOINTER) &data
-                            ));
-                    }
-#endif
 
                     /* Set new data. */
                     buffer->logical[index] = data;

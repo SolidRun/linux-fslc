@@ -30,10 +30,6 @@
 #include "gc_hal_kernel_vg.h"
 #endif
 
-#if gcdSECURITY
-#include "gc_hal_security_interface.h"
-#endif
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -224,11 +220,6 @@ typedef struct _gcsDATABASE
     /* Pointer to database. */
     gcsDATABASE_RECORD_PTR              list[48];
 
-#if gcdSECURE_USER
-    /* Secure cache. */
-    gcskSECURE_CACHE                    cache;
-#endif
-
     gctPOINTER                          handleDatabase;
     gctPOINTER                          handleDatabaseMutex;
 
@@ -415,16 +406,6 @@ gckKERNEL_DeleteName(
     IN gctUINT32 Name
     );
 
-#if gcdSECURE_USER
-/* Get secure cache from the process database. */
-gceSTATUS
-gckKERNEL_GetProcessDBCache(
-    IN gckKERNEL Kernel,
-    IN gctUINT32 ProcessID,
-    OUT gcskSECURE_CACHE_PTR * Cache
-    );
-#endif
-
 /*******************************************************************************
 ********* Timer Management ****************************************************/
 typedef struct _gcsTIMER *           gcsTIMER_PTR;
@@ -554,10 +535,6 @@ struct _gckKERNEL
     /* Level of dump information after stuck. */
     gctUINT                     stuckDump;
 
-#if gcdSECURITY
-    gctUINT32                   securityChannel;
-#endif
-
     /* Timer to monitor GPU stuck. */
     gctPOINTER                  monitorTimer;
 
@@ -672,13 +649,6 @@ struct _gckCOMMAND
 
     /* End Event signal. */
     gctSIGNAL                   endEventSignal;
-
-#if gcdSECURE_USER
-    /* Hint array copy buffer. */
-    gctBOOL                     hintArrayAllocated;
-    gctUINT                     hintArraySize;
-    gctUINT32_PTR               hintArray;
-#endif
 
 #if gcdPROCESS_ADDRESS_SPACE
     gckMMU                      currentMmu;
@@ -1224,89 +1194,11 @@ gckKERNEL_AttachProcessEx(
     IN gctUINT32 PID
     );
 
-#if gcdSECURE_USER
-gceSTATUS
-gckKERNEL_MapLogicalToPhysical(
-    IN gckKERNEL Kernel,
-    IN gcskSECURE_CACHE_PTR Cache,
-    IN OUT gctPOINTER * Data
-    );
-
-gceSTATUS
-gckKERNEL_FlushTranslationCache(
-    IN gckKERNEL Kernel,
-    IN gcskSECURE_CACHE_PTR Cache,
-    IN gctPOINTER Logical,
-    IN gctSIZE_T Bytes
-    );
-#endif
-
 gceSTATUS
 gckHARDWARE_QueryIdle(
     IN gckHARDWARE Hardware,
     OUT gctBOOL_PTR IsIdle
     );
-
-#if gcdSECURITY
-gceSTATUS
-gckKERNEL_SecurityOpen(
-    IN gckKERNEL Kernel,
-    IN gctUINT32 GPU,
-    OUT gctUINT32 *Channel
-    );
-
-/*
-** Close a security service channel
-*/
-gceSTATUS
-gckKERNEL_SecurityClose(
-    IN gctUINT32 Channel
-    );
-
-/*
-** Security service interface.
-*/
-gceSTATUS
-gckKERNEL_SecurityCallService(
-    IN gctUINT32 Channel,
-    IN OUT gcsTA_INTERFACE * Interface
-    );
-
-gceSTATUS
-gckKERNEL_SecurityStartCommand(
-    IN gckKERNEL Kernel
-    );
-
-gceSTATUS
-gckKERNEL_SecurityAllocateSecurityMemory(
-    IN gckKERNEL Kernel,
-    IN gctUINT32 Bytes,
-    OUT gctUINT32 * Handle
-    );
-
-gceSTATUS
-gckKERNEL_SecurityExecute(
-    IN gckKERNEL Kernel,
-    IN gctPOINTER Buffer,
-    IN gctUINT32 Bytes
-    );
-
-gceSTATUS
-gckKERNEL_SecurityMapMemory(
-    IN gckKERNEL Kernel,
-    IN gctUINT32 *PhysicalArray,
-    IN gctUINT32 PageCount,
-    OUT gctUINT32 * GPUAddress
-    );
-
-gceSTATUS
-gckKERNEL_SecurityUnmapMemory(
-    IN gckKERNEL Kernel,
-    IN gctUINT32 GPUAddress,
-    IN gctUINT32 PageCount
-    );
-
-#endif
 
 gceSTATUS
 gckKERNEL_CreateShBuffer(

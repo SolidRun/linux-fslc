@@ -4820,39 +4820,6 @@ struct _gcoOS_SymbolsList
 
 #endif
 
-#if gcdSECURE_USER
-
-#   define gcmDEFINESECUREUSER() \
-        gctUINT         __secure_user_offset__; \
-        gctUINT32_PTR   __secure_user_hintArray__;
-
-#   define gcmBEGINSECUREUSER() \
-        __secure_user_offset__ = reserve->lastOffset; \
-        \
-        __secure_user_hintArray__ = gcmUINT64_TO_PTR(reserve->hintArrayTail)
-
-#   define gcmENDSECUREUSER() \
-        reserve->hintArrayTail = gcmPTR_TO_UINT64(__secure_user_hintArray__)
-
-#   define gcmSKIPSECUREUSER() \
-        __secure_user_offset__ += gcmSIZEOF(gctUINT32)
-
-#   define gcmUPDATESECUREUSER() \
-        *__secure_user_hintArray__ = __secure_user_offset__; \
-        \
-        __secure_user_offset__    += gcmSIZEOF(gctUINT32); \
-        __secure_user_hintArray__ += 1
-
-#else
-
-#   define gcmDEFINESECUREUSER()
-#   define gcmBEGINSECUREUSER()
-#   define gcmENDSECUREUSER()
-#   define gcmSKIPSECUREUSER()
-#   define gcmUPDATESECUREUSER()
-
-#endif
-
 /*----------------------------------------------------------------------------*/
 
 #if gcdDUMP

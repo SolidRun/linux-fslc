@@ -431,10 +431,6 @@ gckKERNEL_Construct(
         /* Initialize virtual command buffer. */
         kernel->virtualCommandBuffer = gcvTRUE;
 
-#if gcdSECURITY
-        kernel->virtualCommandBuffer = gcvFALSE;
-#endif
-
         /* Construct the gckCOMMAND object. */
         gcmkONERROR(
             gckCOMMAND_Construct(kernel, &kernel->command));
@@ -483,11 +479,6 @@ gckKERNEL_Construct(
 
     gcmkONERROR(
         gckOS_CreateMutex(Os, (gctPOINTER)&kernel->virtualBufferLock));
-
-#if gcdSECURITY
-    /* Connect to security service for this GPU. */
-    gcmkONERROR(gckKERNEL_SecurityOpen(kernel, kernel->core, &kernel->securityChannel));
-#endif
 
 #if gcdGPU_TIMEOUT && gcdINTERRUPT_STATISTIC
     if (kernel->timeOut)
@@ -721,10 +712,6 @@ gckKERNEL_Destroy(
 
 #if gcdANDROID_NATIVE_FENCE_SYNC
     gcmkVERIFY_OK(gckOS_DestroySyncTimeline(Kernel->os, Kernel->timeline));
-#endif
-
-#if gcdSECURITY
-    gcmkVERIFY_OK(gckKERNEL_SecurityClose(Kernel->securityChannel));
 #endif
 
     if (Kernel->monitorTimer)
@@ -1189,11 +1176,6 @@ gckKERNEL_LockVideoMemory(
 #endif
 
 
-#if gcdSECURE_USER
-    /* Return logical address as physical address. */
-    Interface->u.LockVideoMemory.address =
-        (gctUINT32)(Interface->u.LockVideoMemory.memory);
-#endif
     gcmkONERROR(
         gckKERNEL_AddProcessDB(Kernel,
             ProcessID, gcvDB_VIDEO_MEMORY_LOCKED,
@@ -1282,37 +1264,11 @@ gckKERNEL_UnlockVideoMemory(
     node = nodeObject->node;
 
     /* Unlock video memory. */
-#if gcdSECURE_USER
-    /* Save node information before it disappears. */
-    if (node->VidMem.memory->object.type == gcvOBJ_VIDMEM)
-    {
-        logical = gcvNULL;
-        bytes   = 0;
-    }
-    else
-    {
-        logical = node->Virtual.logical;
-        bytes   = node->Virtual.bytes;
-    }
-#endif
-
-    /* Unlock video memory. */
     gcmkONERROR(gckVIDMEM_Unlock(
         Kernel,
         nodeObject,
         Interface->u.UnlockVideoMemory.type,
         &Interface->u.UnlockVideoMemory.asynchroneous));
-
-#if gcdSECURE_USER
-    /* Flush the translation cache for virtual surfaces. */
-    if (logical != gcvNULL)
-    {
-        gcmkVERIFY_OK(gckKERNEL_FlushTranslationCache(Kernel,
-                    cache,
-                    logical,
-                    bytes));
-    }
-#endif
 
     gcmkFOOTER_NO();
     return gcvSTATUS_OK;
@@ -1480,10 +1436,6 @@ gckKERNEL_Dispatch(
     gckKERNEL kernel = Kernel;
     gctUINT32 address;
     gctUINT32 processID;
-#if gcdSECURE_USER
-    gcskSECURE_CACHE_PTR cache;
-    gctPOINTER logical;
-#endif
     gctUINT32 paddr = gcvINVALID_ADDRESS;
 #if !USE_NEW_LINUX_SIGNAL
     gctSIGNAL   signal;
@@ -1508,10 +1460,6 @@ gckKERNEL_Dispatch(
 
     /* Get the current process ID. */
     gcmkONERROR(gckOS_GetProcessID(&processID));
-
-#if gcdSECURE_USER
-    gcmkONERROR(gckKERNEL_GetProcessDBCache(Kernel, processID, &cache));
-#endif
 
     /* Dispatch on command. */
     switch (Interface->command)
@@ -1640,14 +1588,6 @@ gckKERNEL_Dispatch(
                                      physical,
                                      gcmUINT64_TO_PTR(Interface->u.FreeNonPagedMemory.logical)));
 
-#if gcdSECURE_USER
-        gcmkVERIFY_OK(gckKERNEL_FlushTranslationCache(
-            Kernel,
-            cache,
-            gcmUINT64_TO_PTR(Interface->u.FreeNonPagedMemory.logical),
-            (gctSIZE_T) Interface->u.FreeNonPagedMemory.bytes));
-#endif
-
         gcmRELEASE_NAME(Interface->u.FreeNonPagedMemory.physical);
         break;
 
@@ -1700,14 +1640,6 @@ gckKERNEL_Dispatch(
                                  physical,
                                  gcmUINT64_TO_PTR(Interface->u.FreeContiguousMemory.logical),
                                  (gctSIZE_T) Interface->u.FreeContiguousMemory.bytes));
-
-#if gcdSECURE_USER
-        gcmkVERIFY_OK(gckKERNEL_FlushTranslationCache(
-            Kernel,
-            cache,
-            gcmUINT64_TO_PTR(Interface->u.FreeContiguousMemory.logical),
-            (gctSIZE_T) Interface->u.FreeContiguousMemory.bytes));
-#endif
 
         gcmRELEASE_NAME(Interface->u.FreeContiguousMemory.physical);
         break;
@@ -1810,14 +1742,6 @@ gckKERNEL_Dispatch(
                                   (gctSIZE_T) Interface->u.UnmapUserMemory.size,
                                   info,
                                   address));
-
-#if gcdSECURE_USER
-        gcmkVERIFY_OK(gckKERNEL_FlushTranslationCache(
-            Kernel,
-            cache,
-            gcmUINT64_TO_PTR(Interface->u.UnmapUserMemory.memory),
-            (gctSIZE_T) Interface->u.UnmapUserMemory.size));
-#endif
 
         gcmRELEASE_NAME(Interface->u.UnmapUserMemory.info);
         break;
@@ -2737,501 +2661,6 @@ OnError:
     return status;
 }
 
-#if gcdSECURE_USER
-gceSTATUS
-gckKERNEL_MapLogicalToPhysical(
-    IN gckKERNEL Kernel,
-    IN gcskSECURE_CACHE_PTR Cache,
-    IN OUT gctPOINTER * Data
-    )
-{
-    gceSTATUS status;
-    static gctBOOL baseAddressValid = gcvFALSE;
-    static gctUINT32 baseAddress;
-    gctBOOL needBase;
-    gcskLOGICAL_CACHE_PTR slot;
-
-    gcmkHEADER_ARG("Kernel=0x%x Cache=0x%x *Data=0x%x",
-                   Kernel, Cache, gcmOPT_POINTER(Data));
-
-    /* Verify the arguments. */
-    gcmkVERIFY_OBJECT(Kernel, gcvOBJ_KERNEL);
-
-    if (!baseAddressValid)
-    {
-        /* Get base address. */
-        gcmkONERROR(gckHARDWARE_GetBaseAddress(Kernel->hardware, &baseAddress));
-
-        baseAddressValid = gcvTRUE;
-    }
-
-    /* Does this state load need a base address? */
-    gcmkONERROR(gckHARDWARE_NeedBaseAddress(Kernel->hardware,
-                                            ((gctUINT32_PTR) Data)[-1],
-                                            &needBase));
-
-#if gcdSECURE_CACHE_METHOD == gcdSECURE_CACHE_LRU
-    {
-        gcskLOGICAL_CACHE_PTR next;
-        gctINT i;
-
-        /* Walk all used cache slots. */
-        for (i = 1, slot = Cache->cache[0].next, next = gcvNULL;
-             (i <= gcdSECURE_CACHE_SLOTS) && (slot->logical != gcvNULL);
-             ++i, slot = slot->next
-        )
-        {
-            if (slot->logical == *Data)
-            {
-                /* Bail out. */
-                next = slot;
-                break;
-            }
-        }
-
-        /* See if we had a miss. */
-        if (next == gcvNULL)
-        {
-            /* Use the tail of the cache. */
-            slot = Cache->cache[0].prev;
-
-            /* Initialize the cache line. */
-            slot->logical = *Data;
-
-            /* Map the logical address to a DMA address. */
-            gcmkONERROR(
-                gckOS_GetPhysicalAddress(Kernel->os, *Data, &slot->dma));
-        }
-
-        /* Move slot to head of list. */
-        if (slot != Cache->cache[0].next)
-        {
-            /* Unlink. */
-            slot->prev->next = slot->next;
-            slot->next->prev = slot->prev;
-
-            /* Move to head of chain. */
-            slot->prev       = &Cache->cache[0];
-            slot->next       = Cache->cache[0].next;
-            slot->prev->next = slot;
-            slot->next->prev = slot;
-        }
-    }
-#elif gcdSECURE_CACHE_METHOD == gcdSECURE_CACHE_LINEAR
-    {
-        gctINT i;
-        gcskLOGICAL_CACHE_PTR next = gcvNULL;
-        gcskLOGICAL_CACHE_PTR oldestSlot = gcvNULL;
-        slot = gcvNULL;
-
-        if (Cache->cacheIndex != gcvNULL)
-        {
-            /* Walk the cache forwards. */
-            for (i = 1, slot = Cache->cacheIndex;
-                 (i <= gcdSECURE_CACHE_SLOTS) && (slot->logical != gcvNULL);
-                 ++i, slot = slot->next)
-            {
-                if (slot->logical == *Data)
-                {
-                    /* Bail out. */
-                    next = slot;
-                    break;
-                }
-
-                /* Determine age of this slot. */
-                if ((oldestSlot       == gcvNULL)
-                ||  (oldestSlot->stamp > slot->stamp)
-                )
-                {
-                    oldestSlot = slot;
-                }
-            }
-
-            if (next == gcvNULL)
-            {
-                /* Walk the cache backwards. */
-                for (slot = Cache->cacheIndex->prev;
-                     (i <= gcdSECURE_CACHE_SLOTS) && (slot->logical != gcvNULL);
-                     ++i, slot = slot->prev)
-                {
-                    if (slot->logical == *Data)
-                    {
-                        /* Bail out. */
-                        next = slot;
-                        break;
-                    }
-
-                    /* Determine age of this slot. */
-                    if ((oldestSlot       == gcvNULL)
-                    ||  (oldestSlot->stamp > slot->stamp)
-                    )
-                    {
-                        oldestSlot = slot;
-                    }
-                }
-            }
-        }
-
-        /* See if we had a miss. */
-        if (next == gcvNULL)
-        {
-            if (Cache->cacheFree != 0)
-            {
-                slot = &Cache->cache[Cache->cacheFree];
-                gcmkASSERT(slot->logical == gcvNULL);
-
-                ++ Cache->cacheFree;
-                if (Cache->cacheFree >= gcmCOUNTOF(Cache->cache))
-                {
-                    Cache->cacheFree = 0;
-                }
-            }
-            else
-            {
-                /* Use the oldest cache slot. */
-                gcmkASSERT(oldestSlot != gcvNULL);
-                slot = oldestSlot;
-
-                /* Unlink from the chain. */
-                slot->prev->next = slot->next;
-                slot->next->prev = slot->prev;
-
-                /* Append to the end. */
-                slot->prev       = Cache->cache[0].prev;
-                slot->next       = &Cache->cache[0];
-                slot->prev->next = slot;
-                slot->next->prev = slot;
-            }
-
-            /* Initialize the cache line. */
-            slot->logical = *Data;
-
-            /* Map the logical address to a DMA address. */
-            gcmkONERROR(
-                gckOS_GetPhysicalAddress(Kernel->os, *Data, &slot->dma));
-        }
-
-        /* Save time stamp. */
-        slot->stamp = ++ Cache->cacheStamp;
-
-        /* Save current slot for next lookup. */
-        Cache->cacheIndex = slot;
-    }
-#elif gcdSECURE_CACHE_METHOD == gcdSECURE_CACHE_HASH
-    {
-        gctINT i;
-        gctUINT32 data = gcmPTR2INT32(*Data);
-        gctUINT32 key, index;
-        gcskLOGICAL_CACHE_PTR hash;
-
-        /* Generate a hash key. */
-        key   = (data >> 24) + (data >> 16) + (data >> 8) + data;
-        index = key % gcmCOUNTOF(Cache->hash);
-
-        /* Get the hash entry. */
-        hash = &Cache->hash[index];
-
-        for (slot = hash->nextHash, i = 0;
-             (slot != gcvNULL) && (i < gcdSECURE_CACHE_SLOTS);
-             slot = slot->nextHash, ++i
-        )
-        {
-            if (slot->logical == (*Data))
-            {
-                break;
-            }
-        }
-
-        if (slot == gcvNULL)
-        {
-            /* Grab from the tail of the cache. */
-            slot = Cache->cache[0].prev;
-
-            /* Unlink slot from any hash table it is part of. */
-            if (slot->prevHash != gcvNULL)
-            {
-                slot->prevHash->nextHash = slot->nextHash;
-            }
-            if (slot->nextHash != gcvNULL)
-            {
-                slot->nextHash->prevHash = slot->prevHash;
-            }
-
-            /* Initialize the cache line. */
-            slot->logical = *Data;
-
-            /* Map the logical address to a DMA address. */
-            gcmkONERROR(
-                gckOS_GetPhysicalAddress(Kernel->os, *Data, &slot->dma));
-
-            if (hash->nextHash != gcvNULL)
-            {
-                gcmkTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_KERNEL,
-                               "Hash Collision: logical=0x%x key=0x%08x",
-                               *Data, key);
-            }
-
-            /* Insert the slot at the head of the hash list. */
-            slot->nextHash     = hash->nextHash;
-            if (slot->nextHash != gcvNULL)
-            {
-                slot->nextHash->prevHash = slot;
-            }
-            slot->prevHash     = hash;
-            hash->nextHash     = slot;
-        }
-
-        /* Move slot to head of list. */
-        if (slot != Cache->cache[0].next)
-        {
-            /* Unlink. */
-            slot->prev->next = slot->next;
-            slot->next->prev = slot->prev;
-
-            /* Move to head of chain. */
-            slot->prev       = &Cache->cache[0];
-            slot->next       = Cache->cache[0].next;
-            slot->prev->next = slot;
-            slot->next->prev = slot;
-        }
-    }
-#elif gcdSECURE_CACHE_METHOD == gcdSECURE_CACHE_TABLE
-    {
-        gctUINT32 index = (gcmPTR2INT32(*Data) % gcdSECURE_CACHE_SLOTS) + 1;
-
-        /* Get cache slot. */
-        slot = &Cache->cache[index];
-
-        /* Check for cache miss. */
-        if (slot->logical != *Data)
-        {
-            /* Initialize the cache line. */
-            slot->logical = *Data;
-
-            /* Map the logical address to a DMA address. */
-            gcmkONERROR(
-                gckOS_GetPhysicalAddress(Kernel->os, *Data, &slot->dma));
-        }
-    }
-#endif
-
-    /* Return DMA address. */
-    *Data = gcmINT2PTR(slot->dma + (needBase ? baseAddress : 0));
-
-    /* Success. */
-    gcmkFOOTER_ARG("*Data=0x%08x", *Data);
-    return gcvSTATUS_OK;
-
-OnError:
-    /* Return the status. */
-    gcmkFOOTER();
-    return status;
-}
-
-gceSTATUS
-gckKERNEL_FlushTranslationCache(
-    IN gckKERNEL Kernel,
-    IN gcskSECURE_CACHE_PTR Cache,
-    IN gctPOINTER Logical,
-    IN gctSIZE_T Bytes
-    )
-{
-    gctINT i;
-    gcskLOGICAL_CACHE_PTR slot;
-    gctUINT8_PTR ptr;
-
-    gcmkHEADER_ARG("Kernel=0x%x Cache=0x%x Logical=0x%x Bytes=%lu",
-                   Kernel, Cache, Logical, Bytes);
-
-    /* Do we need to flush the entire cache? */
-    if (Logical == gcvNULL)
-    {
-        /* Clear all cache slots. */
-        for (i = 1; i <= gcdSECURE_CACHE_SLOTS; ++i)
-        {
-            Cache->cache[i].logical  = gcvNULL;
-
-#if gcdSECURE_CACHE_METHOD == gcdSECURE_CACHE_HASH
-            Cache->cache[i].nextHash = gcvNULL;
-            Cache->cache[i].prevHash = gcvNULL;
-#endif
-}
-
-#if gcdSECURE_CACHE_METHOD == gcdSECURE_CACHE_HASH
-        /* Zero the hash table. */
-        for (i = 0; i < gcmCOUNTOF(Cache->hash); ++i)
-        {
-            Cache->hash[i].nextHash = gcvNULL;
-        }
-#endif
-
-        /* Reset the cache functionality. */
-        Cache->cacheIndex = gcvNULL;
-        Cache->cacheFree  = 1;
-        Cache->cacheStamp = 0;
-    }
-
-    else
-    {
-        gctUINT8_PTR low  = (gctUINT8_PTR) Logical;
-        gctUINT8_PTR high = low + Bytes;
-
-#if gcdSECURE_CACHE_METHOD == gcdSECURE_CACHE_LRU
-        gcskLOGICAL_CACHE_PTR next;
-
-        /* Walk all used cache slots. */
-        for (i = 1, slot = Cache->cache[0].next;
-             (i <= gcdSECURE_CACHE_SLOTS) && (slot->logical != gcvNULL);
-             ++i, slot = next
-        )
-        {
-            /* Save pointer to next slot. */
-            next = slot->next;
-
-            /* Test if this slot falls within the range to flush. */
-            ptr = (gctUINT8_PTR) slot->logical;
-            if ((ptr >= low) && (ptr < high))
-            {
-                /* Unlink slot. */
-                slot->prev->next = slot->next;
-                slot->next->prev = slot->prev;
-
-                /* Append slot to tail of cache. */
-                slot->prev       = Cache->cache[0].prev;
-                slot->next       = &Cache->cache[0];
-                slot->prev->next = slot;
-                slot->next->prev = slot;
-
-                /* Mark slot as empty. */
-                slot->logical = gcvNULL;
-            }
-        }
-
-#elif gcdSECURE_CACHE_METHOD == gcdSECURE_CACHE_LINEAR
-        gcskLOGICAL_CACHE_PTR next;
-
-        for (i = 1, slot = Cache->cache[0].next;
-             (i <= gcdSECURE_CACHE_SLOTS) && (slot->logical != gcvNULL);
-             ++i, slot = next)
-        {
-            /* Save pointer to next slot. */
-            next = slot->next;
-
-            /* Test if this slot falls within the range to flush. */
-            ptr = (gctUINT8_PTR) slot->logical;
-            if ((ptr >= low) && (ptr < high))
-            {
-                /* Test if this slot is the current slot. */
-                if (slot == Cache->cacheIndex)
-                {
-                    /* Move to next or previous slot. */
-                    Cache->cacheIndex = (slot->next->logical != gcvNULL)
-                                      ? slot->next
-                                      : (slot->prev->logical != gcvNULL)
-                                      ? slot->prev
-                                      : gcvNULL;
-                }
-
-                /* Unlink slot from cache. */
-                slot->prev->next = slot->next;
-                slot->next->prev = slot->prev;
-
-                /* Insert slot to head of cache. */
-                slot->prev       = &Cache->cache[0];
-                slot->next       = Cache->cache[0].next;
-                slot->prev->next = slot;
-                slot->next->prev = slot;
-
-                /* Mark slot as empty. */
-                slot->logical = gcvNULL;
-                slot->stamp   = 0;
-            }
-        }
-
-#elif gcdSECURE_CACHE_METHOD == gcdSECURE_CACHE_HASH
-        gctINT j;
-        gcskLOGICAL_CACHE_PTR hash, next;
-
-        /* Walk all hash tables. */
-        for (i = 0, hash = Cache->hash;
-             i < gcmCOUNTOF(Cache->hash);
-             ++i, ++hash)
-        {
-            /* Walk all slots in the hash. */
-            for (j = 0, slot = hash->nextHash;
-                 (j < gcdSECURE_CACHE_SLOTS) && (slot != gcvNULL);
-                 ++j, slot = next)
-            {
-                /* Save pointer to next slot. */
-                next = slot->next;
-
-                /* Test if this slot falls within the range to flush. */
-                ptr = (gctUINT8_PTR) slot->logical;
-                if ((ptr >= low) && (ptr < high))
-                {
-                    /* Unlink slot from hash table. */
-                    if (slot->prevHash == hash)
-                    {
-                        hash->nextHash = slot->nextHash;
-                    }
-                    else
-                    {
-                        slot->prevHash->nextHash = slot->nextHash;
-                    }
-
-                    if (slot->nextHash != gcvNULL)
-                    {
-                        slot->nextHash->prevHash = slot->prevHash;
-                    }
-
-                    /* Unlink slot from cache. */
-                    slot->prev->next = slot->next;
-                    slot->next->prev = slot->prev;
-
-                    /* Append slot to tail of cache. */
-                    slot->prev       = Cache->cache[0].prev;
-                    slot->next       = &Cache->cache[0];
-                    slot->prev->next = slot;
-                    slot->next->prev = slot;
-
-                    /* Mark slot as empty. */
-                    slot->logical  = gcvNULL;
-                    slot->prevHash = gcvNULL;
-                    slot->nextHash = gcvNULL;
-                }
-            }
-        }
-
-#elif gcdSECURE_CACHE_METHOD == gcdSECURE_CACHE_TABLE
-        gctUINT32 index;
-
-        /* Loop while inside the range. */
-        for (i = 1; (low < high) && (i <= gcdSECURE_CACHE_SLOTS); ++i)
-        {
-            /* Get index into cache for this range. */
-            index = (gcmPTR2INT32(low) % gcdSECURE_CACHE_SLOTS) + 1;
-            slot  = &Cache->cache[index];
-
-            /* Test if this slot falls within the range to flush. */
-            ptr = (gctUINT8_PTR) slot->logical;
-            if ((ptr >= low) && (ptr < high))
-            {
-                /* Remove entry from cache. */
-                slot->logical = gcvNULL;
-            }
-
-            /* Next block. */
-            low += gcdSECURE_CACHE_SLOTS;
-        }
-#endif
-    }
-
-    /* Success. */
-    gcmkFOOTER_NO();
-    return gcvSTATUS_OK;
-}
-#endif
-
 /*******************************************************************************
 **
 **  gckKERNEL_Recovery
@@ -3255,10 +2684,6 @@ gckKERNEL_Recovery(
     gceSTATUS status;
     gckEVENT eventObj;
     gckHARDWARE hardware;
-#if gcdSECURE_USER
-    gctUINT32 processID;
-    gcskSECURE_CACHE_PTR cache;
-#endif
     gctUINT32 mask = 0;
     gckCOMMAND command;
     gckENTRYDATA data;
@@ -3283,13 +2708,6 @@ gckKERNEL_Recovery(
     /* Grab gckCOMMAND object. */
     command = Kernel->command;
     gcmkVERIFY_OBJECT(command, gcvOBJ_COMMAND);
-
-#if gcdSECURE_USER
-    /* Flush the secure mapping cache. */
-    gcmkONERROR(gckOS_GetProcessID(&processID));
-    gcmkONERROR(gckKERNEL_GetProcessDBCache(Kernel, processID, &cache));
-    gcmkONERROR(gckKERNEL_FlushTranslationCache(Kernel, cache, gcvNULL, 0));
-#endif
 
     if (Kernel->stuckDump == gcdSTUCK_DUMP_MINIMAL)
     {

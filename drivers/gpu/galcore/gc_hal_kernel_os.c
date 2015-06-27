@@ -1632,9 +1632,7 @@ gckOS_AllocateNonPagedMemory(
             gcmkONERROR(gcvSTATUS_OUT_OF_RESOURCES);
         }
 #else
-#if !gcdSECURITY
         mdlMap->vma->vm_page_prot = gcmkNONPAGED_MEMROY_PROT(mdlMap->vma->vm_page_prot);
-#endif
         mdlMap->vma->vm_flags |= gcdVM_FLAGS;
         mdlMap->vma->vm_pgoff = 0;
 
@@ -1662,11 +1660,7 @@ gckOS_AllocateNonPagedMemory(
     }
     else
     {
-#if gcdSECURITY
-        *Logical = (gctPOINTER)mdl->kaddr;
-#else
         *Logical = (gctPOINTER)mdl->addr;
-#endif
     }
 
     /*
@@ -2091,91 +2085,6 @@ gceSTATUS gckOS_UserLogicalToPhysical(
     return gckOS_GetPhysicalAddress(Os, Logical, Address);
 }
 
-#if gcdSECURE_USER
-static gceSTATUS
-gckOS_AddMapping(
-    IN gckOS Os,
-    IN gctUINT32 Physical,
-    IN gctPOINTER Logical,
-    IN gctSIZE_T Bytes
-    )
-{
-    gceSTATUS status;
-    gcsUSER_MAPPING_PTR map;
-
-    gcmkHEADER_ARG("Os=0x%X Physical=0x%X Logical=0x%X Bytes=%lu",
-                   Os, Physical, Logical, Bytes);
-
-    gcmkONERROR(gckOS_Allocate(Os,
-                               gcmSIZEOF(gcsUSER_MAPPING),
-                               (gctPOINTER *) &map));
-
-    map->next     = Os->userMap;
-    map->physical = Physical - Os->device->baseAddress;
-    map->logical  = Logical;
-    map->bytes    = Bytes;
-    map->start    = (gctINT8_PTR) Logical;
-    map->end      = map->start + Bytes;
-
-    Os->userMap = map;
-
-    gcmkFOOTER_NO();
-    return gcvSTATUS_OK;
-
-OnError:
-    gcmkFOOTER();
-    return status;
-}
-
-static gceSTATUS
-gckOS_RemoveMapping(
-    IN gckOS Os,
-    IN gctPOINTER Logical,
-    IN gctSIZE_T Bytes
-    )
-{
-    gceSTATUS status;
-    gcsUSER_MAPPING_PTR map, prev;
-
-    gcmkHEADER_ARG("Os=0x%X Logical=0x%X Bytes=%lu", Os, Logical, Bytes);
-
-    for (map = Os->userMap, prev = gcvNULL; map != gcvNULL; map = map->next)
-    {
-        if ((map->logical == Logical)
-        &&  (map->bytes   == Bytes)
-        )
-        {
-            break;
-        }
-
-        prev = map;
-    }
-
-    if (map == gcvNULL)
-    {
-        gcmkONERROR(gcvSTATUS_INVALID_ADDRESS);
-    }
-
-    if (prev == gcvNULL)
-    {
-        Os->userMap = map->next;
-    }
-    else
-    {
-        prev->next = map->next;
-    }
-
-    gcmkONERROR(gcmkOS_SAFE_FREE(Os, map));
-
-    gcmkFOOTER_NO();
-    return gcvSTATUS_OK;
-
-OnError:
-    gcmkFOOTER();
-    return status;
-}
-#endif
-
 gceSTATUS
 _ConvertLogical2Physical(
     IN gckOS Os,
@@ -2190,11 +2099,7 @@ _ConvertLogical2Physical(
     PLINUX_MDL_MAP map;
     gcsUSER_MAPPING_PTR userMap;
 
-#if gcdSECURITY
-    base = (Mdl == gcvNULL) ? gcvNULL : (gctINT8_PTR) Mdl->kaddr;
-#else
     base = (Mdl == gcvNULL) ? gcvNULL : (gctINT8_PTR) Mdl->addr;
-#endif
 
     /* Check for the logical address match. */
     if ((base != gcvNULL)
@@ -4696,17 +4601,6 @@ gckOS_MapUserMemory(
 
     gcmkHEADER_ARG("Os=0x%x Core=%d Memory=0x%x Size=%lu", Os, Core, Memory, Size);
 
-#if gcdSECURE_USER
-    gcmkONERROR(gckOS_AddMapping(Os, *Address, Memory, Size));
-
-    gcmkFOOTER_NO();
-    return gcvSTATUS_OK;
-
-OnError:
-    gcmkFOOTER();
-    return status;
-#else
-{
     gctSIZE_T pageCount, i, j;
     gctUINT32_PTR pageTable;
     gctUINT32 address = 0, physical = ~0U;
@@ -4942,51 +4836,6 @@ OnError:
             info->extraPage = 1;
         }
 
-#if gcdSECURITY
-    {
-        gctPHYS_ADDR physicalArrayPhysical;
-        gctPOINTER physicalArrayLogical;
-        gctUINT32_PTR logical;
-        gctSIZE_T bytes = pageCount * gcmSIZEOF(gctUINT32);
-        pageTable = gcvNULL;
-
-        gcmkONERROR(gckOS_AllocateNonPagedMemory(
-            Os,
-            gcvFALSE,
-            &bytes,
-            &physicalArrayPhysical,
-            &physicalArrayLogical
-            ));
-
-        logical = physicalArrayLogical;
-
-        /* Fill the page table. */
-        for (i = 0; i < pageCount; i++)
-        {
-            gctUINT32 phys;
-            phys = page_to_phys(pages[i]);
-
-            logical[i] = phys;
-        }
-        j = 0;
-
-
-        gcmkONERROR(gckKERNEL_SecurityMapMemory(
-            Os->device->kernels[Core],
-            physicalArrayLogical,
-            pageCount,
-            &address
-            ));
-
-        gcmkONERROR(gckOS_FreeNonPagedMemory(
-            Os,
-            1,
-            physicalArrayPhysical,
-            physicalArrayLogical
-            ));
-    }
-
-#else
 #if gcdENABLE_VG
         if (Core == gcvCORE_VG)
         {
@@ -5094,7 +4943,6 @@ OnError:
             gcmkONERROR(gckMMU_Flush(Os->device->kernels[Core]->mmu, gcvSURF_TYPE_UNKNOWN));
 #endif
         }
-#endif
         info->address = address;
 
         /* Save pointer to page table. */
@@ -5203,8 +5051,6 @@ OnError:
 
     return status;
 }
-#endif
-}
 
 /*******************************************************************************
 **
@@ -5246,17 +5092,6 @@ gckOS_UnmapUserMemory(
     gcmkHEADER_ARG("Os=0x%X Core=%d Memory=0x%X Size=%lu Info=0x%X Address0x%08x",
                    Os, Core, Memory, Size, Info, Address);
 
-#if gcdSECURE_USER
-    gcmkONERROR(gckOS_RemoveMapping(Os, Memory, Size));
-
-    gcmkFOOTER_NO();
-    return gcvSTATUS_OK;
-
-OnError:
-    gcmkFOOTER();
-    return status;
-#else
-{
     gctUINTPTR_T memory, start, end;
     gcsPageInfo_PTR info;
     gctSIZE_T pageCount, i;
@@ -5311,29 +5146,13 @@ OnError:
 
         MEMORY_MAP_LOCK(Os);
 
-#if !gcdSECURITY
         gcmkASSERT(info->pageTable != gcvNULL);
-#endif
 
         if (info->extraPage)
         {
             pageCount += 1;
         }
 
-#if gcdSECURITY
-        if (info->address > 0x80000000)
-        {
-            gckKERNEL_SecurityUnmapMemory(
-                Os->device->kernels[Core],
-                info->address,
-                pageCount
-                );
-        }
-        else
-        {
-            gcmkPRINT("Wrong address %s(%d) %x", __FUNCTION__, __LINE__, info->address);
-        }
-#else
 #if gcdENABLE_VG
         if (Core == gcvCORE_VG)
         {
@@ -5366,7 +5185,6 @@ OnError:
                 info->address
                 ));
         }
-#endif
 
         if (info->extraPage)
         {
@@ -5419,8 +5237,6 @@ OnError:
     /* Return the status. */
     gcmkFOOTER();
     return status;
-}
-#endif
 }
 
 /*******************************************************************************
@@ -8237,93 +8053,6 @@ OnError:
 }
 #endif
 
-#if gcdSECURITY
-gceSTATUS
-gckOS_AllocatePageArray(
-    IN gckOS Os,
-    IN gctPHYS_ADDR Physical,
-    IN gctSIZE_T PageCount,
-    OUT gctPOINTER * PageArrayLogical,
-    OUT gctPHYS_ADDR * PageArrayPhysical
-    )
-{
-    gceSTATUS status = gcvSTATUS_OK;
-    PLINUX_MDL  mdl;
-    gctUINT32*  table;
-    gctUINT32   offset;
-    gctSIZE_T   bytes;
-    gckALLOCATOR allocator;
-
-    gcmkHEADER_ARG("Os=0x%X Physical=0x%X PageCount=%u",
-                   Os, Physical, PageCount);
-
-    /* Verify the arguments. */
-    gcmkVERIFY_OBJECT(Os, gcvOBJ_OS);
-    gcmkVERIFY_ARGUMENT(Physical != gcvNULL);
-    gcmkVERIFY_ARGUMENT(PageCount > 0);
-
-    bytes = PageCount * gcmSIZEOF(gctUINT32);
-    gcmkONERROR(gckOS_AllocateNonPagedMemory(
-        Os,
-        gcvFALSE,
-        &bytes,
-        PageArrayPhysical,
-        PageArrayLogical
-        ));
-
-    table = *PageArrayLogical;
-
-    /* Convert pointer to MDL. */
-    mdl = (PLINUX_MDL)Physical;
-
-    allocator = mdl->allocator;
-
-     /* Get all the physical addresses and store them in the page table. */
-
-    offset = 0;
-    PageCount = PageCount / (PAGE_SIZE / 4096);
-
-    /* Try to get the user pages so DMA can happen. */
-    while (PageCount-- > 0)
-    {
-        unsigned long phys = ~0;
-
-        if (mdl->pagedMem && !mdl->contiguous)
-        {
-            if (allocator)
-            {
-                gctUINT32 phys_addr;
-                allocator->ops->Physical(allocator, mdl, offset, &phys_addr);
-                phys = (unsigned long)phys_addr;
-            }
-        }
-        else
-        {
-            if (!mdl->pagedMem)
-            {
-                gcmkTRACE_ZONE(
-                    gcvLEVEL_INFO, gcvZONE_OS,
-                    "%s(%d): we should not get this call for Non Paged Memory!",
-                    __FUNCTION__, __LINE__
-                    );
-            }
-
-            phys = page_to_phys(nth_page(mdl->u.contiguousPages, offset));
-        }
-
-        table[offset] = phys;
-
-        offset += 1;
-    }
-
-OnError:
-
-    /* Return the status. */
-    gcmkFOOTER();
-    return status;
-}
-#endif
-
 gceSTATUS
 gckOS_CPUPhysicalToGPUPhysical(
     IN gckOS Os,
@@ -8404,11 +8133,7 @@ gckOS_QueryOption(
     }
     else if (!strcmp(Option, "mmu"))
     {
-#if gcdSECURITY
-        *Value = 0;
-#else
         *Value = device->mmu;
-#endif
         return gcvSTATUS_OK;
     }
 

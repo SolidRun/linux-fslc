@@ -32,10 +32,6 @@
 #include "gc_hal_statistics.h"
 #endif
 
-#if gcdSECURITY
-#include "gc_hal_security_interface.h"
-#endif
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -1057,40 +1053,6 @@ gceSTATUS
 gckOS_GetThreadID(
     OUT gctUINT32_PTR ThreadID
     );
-
-#if gcdSECURITY
-gceSTATUS
-gckOS_OpenSecurityChannel(
-    IN gckOS Os,
-    IN gceCORE Core,
-    OUT gctUINT32 *Channel
-    );
-
-gceSTATUS
-gckOS_CloseSecurityChannel(
-    IN gctUINT32 Channel
-    );
-
-gceSTATUS
-gckOS_CallSecurityService(
-    IN gctUINT32 Channel,
-    IN gcsTA_INTERFACE * Interface
-    );
-
-gceSTATUS
-gckOS_InitSecurityChannel(
-    OUT gctUINT32 Channel
-    );
-
-gceSTATUS
-gckOS_AllocatePageArray(
-    IN gckOS Os,
-    IN gctPHYS_ADDR Physical,
-    IN gctSIZE_T PageCount,
-    OUT gctPOINTER * PageArrayLogical,
-    OUT gctPHYS_ADDR * PageArrayPhysical
-    );
-#endif
 
 /******************************************************************************\
 ********************************** Signal Object *********************************

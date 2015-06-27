@@ -5385,10 +5385,6 @@ gckHARDWARE_QueryIdle(
 
         else
         {
-#if gcdSECURITY
-            isIdle = gcvTRUE;
-            address = 0;
-#else
             /* Read the current FE address. */
             gcmkONERROR(gckOS_ReadRegisterEx(Hardware->os,
                                              Hardware->core,
@@ -5408,7 +5404,6 @@ gckHARDWARE_QueryIdle(
                 /* FE is not in WAIT/LINK yet. */
                 isIdle = gcvFALSE;
             }
-#endif
         }
     }
 

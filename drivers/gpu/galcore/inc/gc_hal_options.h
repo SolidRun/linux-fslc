@@ -22,14 +22,6 @@
 #define __gc_hal_options_h_
 
 /*
-    gcdSECURITY
-
-*/
-#ifndef gcdSECURITY
-#   define gcdSECURITY                          0
-#endif
-
-/*
     gcdPRINT_VERSION
 
         Print HAL version.
@@ -398,18 +390,6 @@
 #else
 #   define gcdMMU_SIZE                          (2048 << 10)
 #endif
-#endif
-
-/*
-    gcdSECURE_USER
-
-        Use logical addresses instead of physical addresses in user land.  In
-        this case a hint table is created for both command buffers and context
-        buffers, and that hint table will be used to patch up those buffers in
-        the kernel when they are ready to submit.
-*/
-#ifndef gcdSECURE_USER
-#   define gcdSECURE_USER                       0
 #endif
 
 /*

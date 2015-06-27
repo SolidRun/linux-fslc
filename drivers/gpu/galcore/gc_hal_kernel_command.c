@@ -191,140 +191,11 @@ OnError:
     return status;
 }
 
-#if gcdSECURE_USER
-static gceSTATUS
-_ProcessHints(
-    IN gckCOMMAND Command,
-    IN gctUINT32 ProcessID,
-    IN gcoCMDBUF CommandBuffer
-    )
-{
-    gceSTATUS status = gcvSTATUS_OK;
-    gckKERNEL kernel;
-    gctBOOL needCopy = gcvFALSE;
-    gcskSECURE_CACHE_PTR cache;
-    gctUINT8_PTR commandBufferLogical;
-    gctUINT8_PTR hintedData;
-    gctUINT32_PTR hintArray;
-    gctUINT i, hintCount;
-
-    gcmkHEADER_ARG(
-        "Command=0x%08X ProcessID=%d CommandBuffer=0x%08X",
-        Command, ProcessID, CommandBuffer
-        );
-
-    /* Verify the arguments. */
-    gcmkVERIFY_OBJECT(Command, gcvOBJ_COMMAND);
-
-    /* Reset state array pointer. */
-    hintArray = gcvNULL;
-
-    /* Get the kernel object. */
-    kernel = Command->kernel;
-
-    /* Get the cache form the database. */
-    gcmkONERROR(gckKERNEL_GetProcessDBCache(kernel, ProcessID, &cache));
-
-    /* Determine the start of the command buffer. */
-    commandBufferLogical
-        = (gctUINT8_PTR) CommandBuffer->logical
-        +                CommandBuffer->startOffset;
-
-    /* Determine the number of records in the state array. */
-    hintCount = CommandBuffer->hintArrayTail - CommandBuffer->hintArray;
-
-    /* Check wehther we need to copy the structures or not. */
-    gcmkONERROR(gckOS_QueryNeedCopy(Command->os, ProcessID, &needCopy));
-
-    /* Get access to the state array. */
-    if (needCopy)
-    {
-        gctUINT copySize;
-
-        if (Command->hintArrayAllocated &&
-            (Command->hintArraySize < CommandBuffer->hintArraySize))
-        {
-            gcmkONERROR(gcmkOS_SAFE_FREE(Command->os, gcmUINT64_TO_PTR(Command->hintArray)));
-            Command->hintArraySize = gcvFALSE;
-        }
-
-        if (!Command->hintArrayAllocated)
-        {
-            gctPOINTER pointer = gcvNULL;
-
-            gcmkONERROR(gckOS_Allocate(
-                Command->os,
-                CommandBuffer->hintArraySize,
-                &pointer
-                ));
-
-            Command->hintArray          = gcmPTR_TO_UINT64(pointer);
-            Command->hintArrayAllocated = gcvTRUE;
-            Command->hintArraySize      = CommandBuffer->hintArraySize;
-        }
-
-        hintArray = gcmUINT64_TO_PTR(Command->hintArray);
-        copySize   = hintCount * gcmSIZEOF(gctUINT32);
-
-        gcmkONERROR(gckOS_CopyFromUserData(
-            Command->os,
-            hintArray,
-            gcmUINT64_TO_PTR(CommandBuffer->hintArray),
-            copySize
-            ));
-    }
-    else
-    {
-        gctPOINTER pointer = gcvNULL;
-
-        gcmkONERROR(gckOS_MapUserPointer(
-            Command->os,
-            gcmUINT64_TO_PTR(CommandBuffer->hintArray),
-            CommandBuffer->hintArraySize,
-            &pointer
-            ));
-
-        hintArray = pointer;
-    }
-
-    /* Scan through the buffer. */
-    for (i = 0; i < hintCount; i += 1)
-    {
-        /* Determine the location of the hinted data. */
-        hintedData = commandBufferLogical + hintArray[i];
-
-        /* Map handle into physical address. */
-        gcmkONERROR(gckKERNEL_MapLogicalToPhysical(
-            kernel, cache, (gctPOINTER) hintedData
-            ));
-    }
-
-OnError:
-    /* Get access to the state array. */
-    if (!needCopy && (hintArray != gcvNULL))
-    {
-        gcmkVERIFY_OK(gckOS_UnmapUserPointer(
-            Command->os,
-            gcmUINT64_TO_PTR(CommandBuffer->hintArray),
-            CommandBuffer->hintArraySize,
-            hintArray
-            ));
-    }
-
-    /* Return the status. */
-    gcmkFOOTER();
-    return status;
-}
-#endif
-
 static gceSTATUS
 _FlushMMU(
     IN gckCOMMAND Command
     )
 {
-#if gcdSECURITY
-    return gcvSTATUS_OK;
-#else
     gceSTATUS status;
     gctUINT32 oldValue;
     gckHARDWARE hardware = Command->kernel->hardware;
@@ -407,7 +278,6 @@ _FlushMMU(
     return gcvSTATUS_OK;
 OnError:
     return status;
-#endif
 }
 
 static void
@@ -767,15 +637,6 @@ gckCOMMAND_Destroy(
     /* Destroy the commit atom. */
     gcmkVERIFY_OK(gckOS_AtomDestroy(Command->os, Command->atomCommit));
 
-#if gcdSECURE_USER
-    /* Free state array. */
-    if (Command->hintArrayAllocated)
-    {
-        gcmkVERIFY_OK(gcmkOS_SAFE_FREE(Command->os, gcmUINT64_TO_PTR(Command->hintArray)));
-        Command->hintArrayAllocated = gcvFALSE;
-    }
-#endif
-
 #if gcdRECORD_COMMAND
     gckRECORDER_Destory(Command->os, Command->recorder);
 #endif
@@ -1010,19 +871,12 @@ gckCOMMAND_Start(
     Command->offset   = waitLinkBytes;
     Command->newQueue = gcvFALSE;
 
-#if gcdSECURITY
-    /* Start FE by calling security service. */
-    gckKERNEL_SecurityStartCommand(
-        Command->kernel
-        );
-#else
     /* Enable command processor. */
     gcmkONERROR(gckHARDWARE_Execute(
         hardware,
         Command->address,
         waitLinkBytes
         ));
-#endif
 
     /* Command queue is running. */
     Command->running = gcvTRUE;
@@ -1103,12 +957,6 @@ gckCOMMAND_Stop(
         gcmkONERROR(gckHARDWARE_End(
             hardware, Command->waitLogical, &Command->waitSize
             ));
-
-#if gcdSECURITY
-        gcmkONERROR(gckKERNEL_SecurityExecute(
-            Command->kernel, Command->waitLogical, 8
-            ));
-#endif
 
         /* Update queue tail pointer. */
         gcmkONERROR(gckHARDWARE_UpdateQueueTail(Command->kernel->hardware,
@@ -1787,15 +1635,6 @@ gckCOMMAND_Commit(
         contextDumpBytes   = entryBytes;
 #endif
 
-#if gcdSECURITY
-        /* Commit context buffer to trust zone. */
-        gckKERNEL_SecurityExecute(
-            Command->kernel,
-            entryLogical,
-            entryBytes - 8
-            );
-#endif
-
 #if gcdRECORD_COMMAND
         gckRECORDER_Record(
             Command->recorder,
@@ -2037,11 +1876,6 @@ gckCOMMAND_Commit(
     bufferDumpBytes   = commandBufferSize    - offset;
 #endif
 
-#if gcdSECURE_USER
-    /* Process user hints. */
-    gcmkONERROR(_ProcessHints(Command, ProcessID, commandBufferObject));
-#endif
-
     /* Determine the location to jump to for the command buffer being
     ** scheduled. */
     if (Command->newQueue)
@@ -2102,7 +1936,6 @@ gckCOMMAND_Commit(
 
     /* Generate a LINK from the end of the command buffer being scheduled
        back to the kernel command queue. */
-#if !gcdSECURITY
     gcmkONERROR(gckHARDWARE_Link(
         hardware,
         commandBufferLink,
@@ -2110,7 +1943,6 @@ gckCOMMAND_Commit(
         exitBytes,
         &linkBytes
         ));
-#endif
 
 #if gcdNONPAGED_MEMORY_CACHEABLE
     /* Flush the command buffer cache. */
@@ -2138,14 +1970,6 @@ gckCOMMAND_Commit(
     Command->commitStamp++;
 #endif
 
-#if gcdSECURITY
-    /* Submit command buffer to trust zone. */
-    gckKERNEL_SecurityExecute(
-        Command->kernel,
-        commandBufferLogical + offset,
-        commandBufferSize    - offset - 8
-        );
-#else
     /* Generate a LINK from the previous WAIT/LINK command sequence to the
        entry determined above (either the context or the command buffer).
        This LINK replaces the WAIT instruction from the previous WAIT/LINK
@@ -2158,7 +1982,6 @@ gckCOMMAND_Commit(
         entryBytes,
         &Command->waitSize
         ));
-#endif
 
 #if gcdNONPAGED_MEMORY_CACHEABLE
     /* Flush the cache for the link. */

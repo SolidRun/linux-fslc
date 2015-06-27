@@ -1549,10 +1549,6 @@ gckEVENT_Submit(
     gctINT32 oldValue;
 #endif
 
-#if gcdSECURITY
-    gctPOINTER reservedBuffer;
-#endif
-
     gctUINT32 flushBytes;
     gctUINT32 executeBytes;
     gckHARDWARE hardware;
@@ -1653,9 +1649,6 @@ gckEVENT_Submit(
 
             /* Reserve space in the command queue. */
             gcmkONERROR(gckCOMMAND_Reserve(command, bytes, &buffer, &bytes));
-#if gcdSECURITY
-            reservedBuffer = buffer;
-#endif
 
             /* Set the flush in the command queue. */
             gcmkONERROR(gckHARDWARE_Flush(
@@ -1680,16 +1673,8 @@ gckEVENT_Submit(
             /* Advance to next command. */
             buffer = (gctUINT8_PTR)buffer + bytes;
 
-#if gcdSECURITY
-            gckKERNEL_SecurityExecute(
-                Event->kernel,
-                reservedBuffer,
-                executeBytes
-                );
-#else
             /* Execute the hardware event. */
             gcmkONERROR(gckCOMMAND_Execute(command, executeBytes));
-#endif
 #endif
         }
 
@@ -2081,9 +2066,6 @@ gckEVENT_Notify(
     gctINT eventNumber = 0;
 #endif
     gctINT32 free;
-#if gcdSECURE_USER
-    gcskSECURE_CACHE_PTR cache;
-#endif
     gckVIDMEM_NODE nodeObject;
     gcuVIDMEM_NODE_PTR node;
 
@@ -2298,19 +2280,9 @@ gckEVENT_Notify(
         {
             gcsEVENT_PTR recordNext;
             gctPOINTER logical;
-#if gcdSECURE_USER
-            gctSIZE_T bytes;
-#endif
 
             /* Grab next record. */
             recordNext = record->next;
-
-#if gcdSECURE_USER
-            /* Get the cache that belongs to this process. */
-            gcmkONERROR(gckKERNEL_GetProcessDBCache(Event->kernel,
-                        record->processID,
-                        &cache));
-#endif
 
             gcmkTRACE_ZONE_N(
                 gcvLEVEL_INFO, gcvZONE_EVENT,
@@ -2333,16 +2305,6 @@ gckEVENT_Notify(
                             gcmNAME_TO_PTR(record->info.u.FreeNonPagedMemory.physical),
                             gcmUINT64_TO_PTR(record->info.u.FreeNonPagedMemory.logical));
 
-                if (gcmIS_SUCCESS(status))
-                {
-#if gcdSECURE_USER
-                    gcmkVERIFY_OK(gckKERNEL_FlushTranslationCache(
-                        Event->kernel,
-                        cache,
-                        gcmUINT64_TO_PTR(record->record.u.FreeNonPagedMemory.logical),
-                        (gctSIZE_T) record->record.u.FreeNonPagedMemory.bytes));
-#endif
-                }
                 gcmRELEASE_NAME(record->info.u.FreeNonPagedMemory.physical);
                 break;
 
@@ -2359,16 +2321,6 @@ gckEVENT_Notify(
                             gcmUINT64_TO_PTR(record->info.u.FreeContiguousMemory.logical),
                             (gctSIZE_T) record->info.u.FreeContiguousMemory.bytes);
 
-                if (gcmIS_SUCCESS(status))
-                {
-#if gcdSECURE_USER
-                    gcmkVERIFY_OK(gckKERNEL_FlushTranslationCache(
-                        Event->kernel,
-                        cache,
-                        gcmUINT64_TO_PTR(event->event.u.FreeContiguousMemory.logical),
-                        (gctSIZE_T) event->event.u.FreeContiguousMemory.bytes));
-#endif
-                }
                 gcmRELEASE_NAME(record->info.u.FreeContiguousMemory.physical);
                 break;
 
@@ -2402,38 +2354,12 @@ gckEVENT_Notify(
 
                 node = nodeObject->node;
 
-                /* Save node information before it disappears. */
-#if gcdSECURE_USER
-                node = event->event.u.UnlockVideoMemory.node;
-                if (node->VidMem.memory->object.type == gcvOBJ_VIDMEM)
-                {
-                    logical = gcvNULL;
-                    bytes   = 0;
-                }
-                else
-                {
-                    logical = node->Virtual.logical;
-                    bytes   = node->Virtual.bytes;
-                }
-#endif
-
                 /* Unlock. */
                 status = gckVIDMEM_Unlock(
                     Event->kernel,
                     nodeObject,
                     record->info.u.UnlockVideoMemory.type,
                     gcvNULL);
-
-#if gcdSECURE_USER
-                if (gcmIS_SUCCESS(status) && (logical != gcvNULL))
-                {
-                    gcmkVERIFY_OK(gckKERNEL_FlushTranslationCache(
-                        Event->kernel,
-                        cache,
-                        logical,
-                        bytes));
-                }
-#endif
 
 #if gcdPROCESS_ADDRESS_SPACE
                 gcmkVERIFY_OK(gckVIDMEM_NODE_Unlock(
@@ -2488,16 +2414,6 @@ gckEVENT_Notify(
                     info,
                     record->info.u.UnmapUserMemory.address);
 
-#if gcdSECURE_USER
-                if (gcmIS_SUCCESS(status))
-                {
-                    gcmkVERIFY_OK(gckKERNEL_FlushTranslationCache(
-                        Event->kernel,
-                        cache,
-                        gcmUINT64_TO_PTR(record->info.u.UnmapUserMemory.memory),
-                        (gctSIZE_T) record->info.u.UnmapUserMemory.size));
-                }
-#endif
                 gcmRELEASE_NAME(record->info.u.UnmapUserMemory.info);
                 break;
 

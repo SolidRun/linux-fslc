@@ -1529,32 +1529,6 @@ gckVIDMEM_Lock(
             }
             else
             {
-#if gcdSECURITY
-                gctPHYS_ADDR physicalArrayPhysical;
-                gctPOINTER physicalArrayLogical;
-
-                gcmkONERROR(gckOS_AllocatePageArray(
-                    os,
-                    node->Virtual.physical,
-                    node->Virtual.pageCount,
-                    &physicalArrayLogical,
-                    &physicalArrayPhysical
-                    ));
-
-                gcmkONERROR(gckKERNEL_SecurityMapMemory(
-                    Kernel,
-                    physicalArrayLogical,
-                    node->Virtual.pageCount,
-                    &node->Virtual.addresses[Kernel->core]
-                    ));
-
-                gcmkONERROR(gckOS_FreeNonPagedMemory(
-                    os,
-                    1,
-                    physicalArrayPhysical,
-                    physicalArrayLogical
-                    ));
-#else
 #if gcdENABLE_VG
                 if (Kernel->vg != gcvNULL)
                 {
@@ -1598,7 +1572,6 @@ gckVIDMEM_Lock(
                 {
                     gcmkONERROR(gckMMU_Flush(Kernel->mmu, node->Virtual.type));
                 }
-#endif
             }
             gcmkTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_VIDMEM,
                            "Mapped virtual node 0x%x to 0x%08X",
@@ -1781,16 +1754,6 @@ gckVIDMEM_Unlock(
             /* See if we can unlock the resources. */
             if (node->Virtual.lockeds[Kernel->core] == 0)
             {
-#if gcdSECURITY
-                if (node->Virtual.addresses[Kernel->core] > 0x80000000)
-                {
-                    gcmkONERROR(gckKERNEL_SecurityUnmapMemory(
-                        Kernel,
-                        node->Virtual.addresses[Kernel->core],
-                        node->Virtual.pageCount
-                        ));
-                }
-#else
                 /* Free the page table. */
                 if (node->Virtual.pageTables[Kernel->core] != gcvNULL)
                 {
@@ -1821,7 +1784,6 @@ gckVIDMEM_Unlock(
                     node->Virtual.pageTables[Kernel->core] = gcvNULL;
                     node->Virtual.lockKernels[Kernel->core] = gcvNULL;
                 }
-#endif
             }
 
             gcmkTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_VIDMEM,

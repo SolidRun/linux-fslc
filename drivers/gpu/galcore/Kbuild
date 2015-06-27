@@ -100,11 +100,6 @@ EXTRA_CFLAGS += -Idrivers/staging/android
 OBJS += gc_hal_kernel_sync.o
 endif
 
-ifeq ($(SECURITY), 1)
-OBJS += gc_hal_kernel_security_channel.o \
-        gc_hal_kernel_security.o
-endif
-
 ifneq ($(CUSTOMER_ALLOCATOR_OBJS),)
 OBJS += $(CUSTOMER_ALLOCATOR_OBJS)
 endif
@@ -233,10 +228,6 @@ ifeq ($(gcdFPGA_BUILD), 1)
 EXTRA_CFLAGS += -DgcdFPGA_BUILD=1
 else
 EXTRA_CFLAGS += -DgcdFPGA_BUILD=0
-endif
-
-ifeq ($(SECURITY), 1)
-EXTRA_CFLAGS += -DgcdSECURITY=1
 endif
 
 EXTRA_CFLAGS += -I$(AQROOT)
