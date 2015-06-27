@@ -430,9 +430,6 @@ gckKERNEL_MapVideoMemory(
 gceSTATUS
 gckKERNEL_Notify(
     IN gckKERNEL Kernel,
-#if gcdMULTI_GPU
-    IN gctUINT CoreId,
-#endif
     IN gceNOTIFY Notification,
     IN gctBOOL Data
     )
@@ -454,9 +451,6 @@ gckKERNEL_Notify(
         status = gckINTERRUPT_Notify(Kernel->interrupt, Data);
 #else
         status = gckHARDWARE_Interrupt(Kernel->hardware,
-#if gcdMULTI_GPU
-                                       CoreId,
-#endif
                                        Data);
 #endif
         break;

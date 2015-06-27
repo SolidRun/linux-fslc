@@ -30,26 +30,13 @@
 extern "C" {
 #endif
 
-
-#if defined(_WIN32) || defined(__VC32__) && !defined(__CYGWIN__) && !defined(__SCITECH_SNAP__)
-/* Win32 and Windows CE platforms. */
-#include <windows.h>
-typedef HDC             HALNativeDisplayType;
-typedef HWND            HALNativeWindowType;
-typedef HBITMAP         HALNativePixmapType;
-
-typedef struct __BITFIELDINFO{
-    BITMAPINFO    bmi;
-    RGBQUAD       bmiColors[2];
-} BITFIELDINFO;
-
-#elif defined(LINUX) && defined(EGL_API_DFB) && !defined(__APPLE__)
+#if defined(LINUX) && defined(EGL_API_DFB)
 #include <directfb.h>
 typedef struct _DFBDisplay * HALNativeDisplayType;
 typedef struct _DFBWindow *  HALNativeWindowType;
 typedef struct _DFBPixmap *  HALNativePixmapType;
 
-#elif defined(LINUX) && defined(EGL_API_FB) && !defined(__APPLE__)
+#elif defined(LINUX) && defined(EGL_API_FB)
 
 #if defined(EGL_API_WL)
 
@@ -147,7 +134,7 @@ struct egl_native_pixmap_t;
     typedef void*                               HALNativeDisplayType;
 #endif
 
-#elif defined(LINUX) || defined(__APPLE__)
+#elif defined(LINUX)
 /* X11 platform. */
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
@@ -174,14 +161,6 @@ typedef Pixmap      HALNativePixmapType;
 #   undef CurrentTime
 #   define XCurrentTime 0
 #endif
-
-#elif defined(__QNXNTO__)
-#include <screen/screen.h>
-
-/* VOID */
-typedef int              HALNativeDisplayType;
-typedef screen_window_t  HALNativeWindowType;
-typedef screen_pixmap_t  HALNativePixmapType;
 
 #else
 

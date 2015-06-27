@@ -258,12 +258,6 @@ typedef struct _halDISPLAY_INFO
 
     int                wrapFB;   /* true if compositor, false otherwise. */
 
-#ifndef __QNXNTO__
-    /* 355_FB_MULTI_BUFFER */
-    int                      multiBuffer;
-    int                      backBufferY;
-#endif
-
     /* The color info of the display. */
     unsigned int                alphaLength;
     unsigned int                alphaOffset;

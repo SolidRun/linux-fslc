@@ -187,17 +187,10 @@ typedef enum _gceCORE
     gcvCORE_MAJOR       = 0x0,
     gcvCORE_2D          = 0x1,
     gcvCORE_VG          = 0x2,
-#if gcdMULTI_GPU_AFFINITY
-    gcvCORE_OCL         = 0x3,
-#endif
 }
 gceCORE;
 
-#if gcdMULTI_GPU_AFFINITY
-#define gcdMAX_GPU_COUNT               4
-#else
 #define gcdMAX_GPU_COUNT               3
-#endif
 
 #define gcdMAX_SURF_LAYER              4
 
@@ -549,26 +542,6 @@ gckOS_WriteRegisterEx(
     IN gctUINT32 Address,
     IN gctUINT32 Data
     );
-
-#if gcdMULTI_GPU
-gceSTATUS
-gckOS_ReadRegisterByCoreId(
-    IN gckOS Os,
-    IN gceCORE Core,
-    IN gctUINT32 CoreId,
-    IN gctUINT32 Address,
-    OUT gctUINT32 * Data
-    );
-
-gceSTATUS
-gckOS_WriteRegisterByCoreId(
-    IN gckOS Os,
-    IN gceCORE Core,
-    IN gctUINT32 CoreId,
-    IN gctUINT32 Address,
-    IN gctUINT32 Data
-    );
-#endif
 
 /* Write data to a 32-bit memory location. */
 gceSTATUS
@@ -1281,22 +1254,12 @@ gckOS_SignalUserSignal(
 #endif /* USE_NEW_LINUX_SIGNAL */
 
 /* Set a signal owned by a process. */
-#if defined(__QNXNTO__)
-gceSTATUS
-gckOS_UserSignal(
-    IN gckOS Os,
-    IN gctSIGNAL Signal,
-    IN gctINT Recvid,
-    IN gctINT Coid
-    );
-#else
 gceSTATUS
 gckOS_UserSignal(
     IN gckOS Os,
     IN gctSIGNAL Signal,
     IN gctHANDLE Process
     );
-#endif
 
 /******************************************************************************\
 ** Cache Support
@@ -1733,17 +1696,11 @@ typedef enum _gceKERNEL_FLUSH
     gcvFLUSH_DEPTH              = 0x02,
     gcvFLUSH_TEXTURE            = 0x04,
     gcvFLUSH_2D                 = 0x08,
-#if gcdMULTI_GPU
-    gcvFLUSH_L2                 = 0x10,
-#endif
     gcvFLUSH_TILE_STATUS        = 0x20,
     gcvFLUSH_ALL                = gcvFLUSH_COLOR
                                 | gcvFLUSH_DEPTH
                                 | gcvFLUSH_TEXTURE
                                 | gcvFLUSH_2D
-#if gcdMULTI_GPU
-                                | gcvFLUSH_L2
-#endif
                                 | gcvFLUSH_TILE_STATUS
 }
 gceKERNEL_FLUSH;
@@ -1836,10 +1793,6 @@ gckKERNEL_MapVideoMemory(
     IN gckKERNEL Kernel,
     IN gctBOOL InUserSpace,
     IN gctUINT32 Address,
-#ifdef __QNXNTO__
-    IN gctUINT32 Pid,
-    IN gctUINT32 Bytes,
-#endif
     OUT gctPOINTER * Logical
     );
 
@@ -1850,23 +1803,8 @@ gckKERNEL_MapVideoMemoryEx(
     IN gceCORE Core,
     IN gctBOOL InUserSpace,
     IN gctUINT32 Address,
-#ifdef __QNXNTO__
-    IN gctUINT32 Pid,
-    IN gctUINT32 Bytes,
-#endif
     OUT gctPOINTER * Logical
     );
-
-#ifdef __QNXNTO__
-/* Unmap video memory. */
-gceSTATUS
-gckKERNEL_UnmapVideoMemory(
-    IN gckKERNEL Kernel,
-    IN gctPOINTER Logical,
-    IN gctUINT32 Pid,
-    IN gctUINT32 Bytes
-    );
-#endif
 
 /* Map memory. */
 gceSTATUS
@@ -1890,9 +1828,6 @@ gckKERNEL_UnmapMemory(
 gceSTATUS
 gckKERNEL_Notify(
     IN gckKERNEL Kernel,
-#if gcdMULTI_GPU
-    IN gctUINT CoreId,
-#endif
     IN gceNOTIFY Notifcation,
     IN gctBOOL Data
     );
@@ -2051,16 +1986,6 @@ gckHARDWARE_End(
     IN OUT gctUINT32 * Bytes
     );
 
-#if gcdMULTI_GPU
-gceSTATUS
-gckHARDWARE_ChipEnable(
-    IN gckHARDWARE Hardware,
-    IN gctPOINTER Logical,
-    IN gceCORE_3D_MASK ChipEnable,
-    IN OUT gctSIZE_T * Bytes
-    );
-#endif
-
 /* Add a NOP command in the command queue. */
 gceSTATUS
 gckHARDWARE_Nop(
@@ -2158,9 +2083,6 @@ gckHARDWARE_ConvertLogical(
 gceSTATUS
 gckHARDWARE_Interrupt(
     IN gckHARDWARE Hardware,
-#if gcdMULTI_GPU
-    IN gctUINT CoreId,
-#endif
     IN gctBOOL InterruptValid
     );
 
@@ -2443,16 +2365,6 @@ gckEVENT_Destroy(
     );
 
 /* Reserve the next available hardware event. */
-#if gcdMULTI_GPU
-gceSTATUS
-gckEVENT_GetEvent(
-    IN gckEVENT Event,
-    IN gctBOOL Wait,
-    OUT gctUINT8 * EventID,
-    IN gceKERNEL_WHERE Source,
-    IN gceCORE_3D_MASK ChipEnable
-    );
-#else
 gceSTATUS
 gckEVENT_GetEvent(
     IN gckEVENT Event,
@@ -2460,7 +2372,6 @@ gckEVENT_GetEvent(
     OUT gctUINT8 * EventID,
     IN gceKERNEL_WHERE Source
    );
-#endif
 
 /* Add a new event to the list of events. */
 gceSTATUS
@@ -2533,37 +2444,18 @@ gckEVENT_DestroyVirtualCommandBuffer(
     IN gceKERNEL_WHERE FromWhere
     );
 
-#if gcdMULTI_GPU
-gceSTATUS
-gckEVENT_Submit(
-    IN gckEVENT Event,
-    IN gctBOOL Wait,
-    IN gctBOOL FromPower,
-    IN gceCORE_3D_MASK ChipEnable
-    );
-#else
 gceSTATUS
 gckEVENT_Submit(
     IN gckEVENT Event,
     IN gctBOOL Wait,
     IN gctBOOL FromPower
     );
-#endif
 
-#if gcdMULTI_GPU
-gceSTATUS
-gckEVENT_Commit(
-    IN gckEVENT Event,
-    IN gcsQUEUE_PTR Queue,
-    IN gceCORE_3D_MASK ChipEnable
-    );
-#else
 gceSTATUS
 gckEVENT_Commit(
     IN gckEVENT Event,
     IN gcsQUEUE_PTR Queue
     );
-#endif
 
 /* Schedule a composition event. */
 gceSTATUS
@@ -2583,9 +2475,6 @@ gckEVENT_Notify(
 gceSTATUS
 gckEVENT_Interrupt(
     IN gckEVENT Event,
-#if gcdMULTI_GPU
-    IN gctUINT CoreId,
-#endif
     IN gctUINT32 IDs
     );
 
@@ -2639,19 +2528,6 @@ gckCOMMAND_Stop(
     IN gctBOOL FromRecovery
     );
 
-#if gcdMULTI_GPU
-/* Commit a buffer to the command queue. */
-gceSTATUS
-gckCOMMAND_Commit(
-    IN gckCOMMAND Command,
-    IN gckCONTEXT Context,
-    IN gcoCMDBUF CommandBuffer,
-    IN gcsSTATE_DELTA_PTR StateDelta,
-    IN gcsQUEUE_PTR EventQueue,
-    IN gctUINT32 ProcessID,
-    IN gceCORE_3D_MASK ChipEnable
-    );
-#else
 gceSTATUS
 gckCOMMAND_Commit(
     IN gckCOMMAND Command,
@@ -2661,7 +2537,6 @@ gckCOMMAND_Commit(
     IN gcsQUEUE_PTR EventQueue,
     IN gctUINT32 ProcessID
     );
-#endif
 
 /* Reserve space in the command buffer. */
 gceSTATUS
@@ -2680,20 +2555,11 @@ gckCOMMAND_Execute(
     );
 
 /* Stall the command queue. */
-#if gcdMULTI_GPU
-gceSTATUS
-gckCOMMAND_Stall(
-    IN gckCOMMAND Command,
-    IN gctBOOL FromPower,
-    IN gceCORE_3D_MASK ChipEnable
-    );
-#else
 gceSTATUS
 gckCOMMAND_Stall(
     IN gckCOMMAND Command,
     IN gctBOOL FromPower
     );
-#endif
 
 /* Attach user process. */
 gceSTATUS

@@ -25,9 +25,7 @@
 #include "gc_hal_kernel_linux.h"
 #include "gc_hal_driver.h"
 
-#if USE_PLATFORM_DRIVER
-#   include <linux/platform_device.h>
-#endif
+#include <linux/platform_device.h>
 
 #ifdef CONFIG_PXA_DVFM
 #   include <mach/dvfm.h>
@@ -50,25 +48,6 @@ static gckGALDEVICE galDevice;
 static uint major = 199;
 module_param(major, uint, 0644);
 
-#if gcdMULTI_GPU || gcdMULTI_GPU_AFFINITY
-static int irqLine3D0 = -1;
-module_param(irqLine3D0, int, 0644);
-
-static ulong registerMemBase3D0 = 0;
-module_param(registerMemBase3D0, ulong, 0644);
-
-static ulong registerMemSize3D0 = 2 << 10;
-module_param(registerMemSize3D0, ulong, 0644);
-
-static int irqLine3D1 = -1;
-module_param(irqLine3D1, int, 0644);
-
-static ulong registerMemBase3D1 = 0;
-module_param(registerMemBase3D1, ulong, 0644);
-
-static ulong registerMemSize3D1 = 2 << 10;
-module_param(registerMemSize3D1, ulong, 0644);
-#else
 static int irqLine = -1;
 module_param(irqLine, int, 0644);
 
@@ -77,7 +56,6 @@ module_param(registerMemBase, ulong, 0644);
 
 static ulong registerMemSize = 2 << 10;
 module_param(registerMemSize, ulong, 0644);
-#endif
 
 static int irqLine2D = -1;
 module_param(irqLine2D, int, 0644);
@@ -190,12 +168,9 @@ _UpdateModuleParam(
     gcsMODULE_PARAMETERS *Param
     )
 {
-#if gcdMULTI_GPU || gcdMULTI_GPU_AFFINITY
-#else
     irqLine           = Param->irqLine ;
     registerMemBase   = Param->registerMemBase;
     registerMemSize   = Param->registerMemSize;
-#endif
     irqLine2D         = Param->irqLine2D      ;
     registerMemBase2D = Param->registerMemBase2D;
     registerMemSize2D = Param->registerMemSize2D;
@@ -226,22 +201,9 @@ gckOS_DumpParam(
     )
 {
     printk("Galcore options:\n");
-#if gcdMULTI_GPU || gcdMULTI_GPU_AFFINITY
-    printk("  irqLine3D0         = %d\n",      irqLine3D0);
-    printk("  registerMemBase3D0 = 0x%08lX\n", registerMemBase3D0);
-    printk("  registerMemSize3D0 = 0x%08lX\n", registerMemSize3D0);
-
-    if (irqLine3D1 != -1)
-    {
-        printk("  irqLine3D1         = %d\n",      irqLine3D1);
-        printk("  registerMemBase3D1 = 0x%08lX\n", registerMemBase3D1);
-        printk("  registerMemSize3D1 = 0x%08lX\n", registerMemSize3D1);
-    }
-#else
     printk("  irqLine           = %d\n",      irqLine);
     printk("  registerMemBase   = 0x%08lX\n", registerMemBase);
     printk("  registerMemSize   = 0x%08lX\n", registerMemSize);
-#endif
 
     if (irqLine2D != -1)
     {
@@ -796,11 +758,7 @@ OnError:
 }
 
 
-#if !USE_PLATFORM_DRIVER
-static int __init drv_init(void)
-#else
 static int drv_init(void)
-#endif
 {
     int ret;
     int result = -EINVAL;
@@ -842,15 +800,8 @@ static int drv_init(void)
 
     /* Create the GAL device. */
     status = gckGALDEVICE_Construct(
-#if gcdMULTI_GPU || gcdMULTI_GPU_AFFINITY
-        irqLine3D0,
-        registerMemBase3D0, registerMemSize3D0,
-        irqLine3D1,
-        registerMemBase3D1, registerMemSize3D1,
-#else
         irqLine,
         registerMemBase, registerMemSize,
-#endif
         irqLine2D,
         registerMemBase2D, registerMemSize2D,
         irqLineVG,
@@ -922,21 +873,12 @@ static int drv_init(void)
     galDevice = device;
     gpuClass  = device_class;
 
-#if gcdMULTI_GPU || gcdMULTI_GPU_AFFINITY
-    gcmkTRACE_ZONE(
-        gcvLEVEL_INFO, gcvZONE_DRIVER,
-        "%s(%d): irqLine3D0=%d, contiguousSize=%lu, memBase3D0=0x%lX\n",
-        __FUNCTION__, __LINE__,
-        irqLine3D0, contiguousSize, registerMemBase3D0
-        );
-#else
     gcmkTRACE_ZONE(
         gcvLEVEL_INFO, gcvZONE_DRIVER,
         "%s(%d): irqLine=%d, contiguousSize=%lu, memBase=0x%lX\n",
         __FUNCTION__, __LINE__,
         irqLine, contiguousSize, registerMemBase
         );
-#endif
 
     /* Success. */
     gcmkFOOTER_NO();
@@ -960,11 +902,7 @@ OnError:
     return result;
 }
 
-#if !USE_PLATFORM_DRIVER
-static void __exit drv_exit(void)
-#else
 static void drv_exit(void)
-#endif
 {
     gcmkHEADER();
 
@@ -985,21 +923,13 @@ static void drv_exit(void)
     gcmkFOOTER_NO();
 }
 
-#if !USE_PLATFORM_DRIVER
-    module_init(drv_init);
-    module_exit(drv_exit);
-#else
-
 static int gpu_probe(struct platform_device *pdev)
 {
     int ret = -ENODEV;
     gcsMODULE_PARAMETERS moduleParam = {
-#if gcdMULTI_GPU || gcdMULTI_GPU_AFFINITY
-#else
         .irqLine            = irqLine,
         .registerMemBase    = registerMemBase,
         .registerMemSize    = registerMemSize,
-#endif
         .irqLine2D          = irqLine2D,
         .registerMemBase2D  = registerMemBase2D,
         .registerMemSize2D  = registerMemSize2D,
@@ -1320,5 +1250,3 @@ static void __exit gpu_exit(void)
 
 module_init(gpu_init);
 module_exit(gpu_exit);
-
-#endif

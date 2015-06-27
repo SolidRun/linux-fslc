@@ -429,12 +429,7 @@ gckKERNEL_Construct(
                         ;
 
         /* Initialize virtual command buffer. */
-        /* TODO: Remove platform limitation after porting. */
-#if (defined(LINUX) || defined(__QNXNTO__))
         kernel->virtualCommandBuffer = gcvTRUE;
-#else
-        kernel->virtualCommandBuffer = gcvFALSE;
-#endif
 
 #if gcdSECURITY
         kernel->virtualCommandBuffer = gcvFALSE;
@@ -630,9 +625,6 @@ gckKERNEL_Destroy(
 
     /* Verify the arguments. */
     gcmkVERIFY_OBJECT(Kernel, gcvOBJ_KERNEL);
-#if QNX_SINGLE_THREADED_DEBUGGING
-    gcmkVERIFY_OK(gckOS_DeleteMutex(Kernel->os, Kernel->debugMutex));
-#endif
 
     /* Destroy the database. */
     if (Kernel->dbCreated)
@@ -1143,9 +1135,7 @@ gckKERNEL_LockVideoMemory(
     gcuVIDMEM_NODE_PTR node   = gcvNULL;
     gctBOOL locked            = gcvFALSE;
     gctBOOL asynchronous      = gcvFALSE;
-#ifndef __QNXNTO__
     gctPOINTER pointer        = gcvNULL;
-#endif
 
     gcmkHEADER_ARG("Kernel=0x%08X ProcessID=%d",
                    Kernel, ProcessID);
@@ -1173,21 +1163,6 @@ gckKERNEL_LockVideoMemory(
     if (node->VidMem.memory->object.type == gcvOBJ_VIDMEM)
     {
         /* Map video memory address into user space. */
-#ifdef __QNXNTO__
-        if (node->VidMem.logical == gcvNULL)
-        {
-            gcmkONERROR(
-                    gckKERNEL_MapVideoMemory(Kernel,
-                        FromUser,
-                        Interface->u.LockVideoMemory.address,
-                        ProcessID,
-                        node->VidMem.bytes,
-                        &node->VidMem.logical));
-        }
-        gcmkASSERT(node->VidMem.logical != gcvNULL);
-
-        Interface->u.LockVideoMemory.memory = gcmPTR_TO_UINT64(node->VidMem.logical);
-#else
         gcmkONERROR(
                 gckKERNEL_MapVideoMemoryEx(Kernel,
                     Core,
@@ -1196,7 +1171,6 @@ gckKERNEL_LockVideoMemory(
                     &pointer));
 
         Interface->u.LockVideoMemory.memory = gcmPTR_TO_UINT64(pointer);
-#endif
     }
     else
     {
@@ -1531,9 +1505,6 @@ gckKERNEL_Dispatch(
                    "Dispatching command %d (%s)",
                    Interface->command, _DispatchText[Interface->command]);
 #endif
-#if QNX_SINGLE_THREADED_DEBUGGING
-    gckOS_AcquireMutex(Kernel->os, Kernel->debugMutex, gcvINFINITE);
-#endif
 
     /* Get the current process ID. */
     gcmkONERROR(gckOS_GetProcessID(&processID));
@@ -1779,56 +1750,13 @@ gckKERNEL_Dispatch(
 
     case gcvHAL_EVENT_COMMIT:
         /* Commit an event queue. */
-#if gcdMULTI_GPU
-        if (Interface->u.Event.gpuMode == gcvMULTI_GPU_MODE_INDEPENDENT)
-        {
-            gcmkONERROR(
-                gckEVENT_Commit(Kernel->eventObj,
-                                gcmUINT64_TO_PTR(Interface->u.Event.queue),
-                                Interface->u.Event.chipEnable));
-        }
-        else
-        {
-            gcmkONERROR(
-                gckEVENT_Commit(Kernel->eventObj,
-                                gcmUINT64_TO_PTR(Interface->u.Event.queue),
-                                gcvCORE_3D_ALL_MASK));
-        }
-#else
         gcmkONERROR(
             gckEVENT_Commit(Kernel->eventObj,
                             gcmUINT64_TO_PTR(Interface->u.Event.queue)));
-#endif
         break;
 
     case gcvHAL_COMMIT:
         /* Commit a command and context buffer. */
-#if gcdMULTI_GPU
-        if (Interface->u.Commit.gpuMode == gcvMULTI_GPU_MODE_INDEPENDENT)
-        {
-            gcmkONERROR(
-                gckCOMMAND_Commit(Kernel->command,
-                                  Interface->u.Commit.context ?
-                                      gcmNAME_TO_PTR(Interface->u.Commit.context) : gcvNULL,
-                                  gcmUINT64_TO_PTR(Interface->u.Commit.commandBuffer),
-                                  gcmUINT64_TO_PTR(Interface->u.Commit.delta),
-                                  gcmUINT64_TO_PTR(Interface->u.Commit.queue),
-                                  processID,
-                                  Interface->u.Commit.chipEnable));
-        }
-        else
-        {
-            gcmkONERROR(
-                gckCOMMAND_Commit(Kernel->command,
-                                  Interface->u.Commit.context ?
-                                      gcmNAME_TO_PTR(Interface->u.Commit.context) : gcvNULL,
-                                  gcmUINT64_TO_PTR(Interface->u.Commit.commandBuffer),
-                                  gcmUINT64_TO_PTR(Interface->u.Commit.delta),
-                                  gcmUINT64_TO_PTR(Interface->u.Commit.queue),
-                                  processID,
-                                  gcvCORE_3D_ALL_MASK));
-        }
-#else
         gcmkONERROR(
             gckCOMMAND_Commit(Kernel->command,
                               Interface->u.Commit.context ?
@@ -1837,17 +1765,12 @@ gckKERNEL_Dispatch(
                               gcmUINT64_TO_PTR(Interface->u.Commit.delta),
                               gcmUINT64_TO_PTR(Interface->u.Commit.queue),
                               processID));
-#endif
 
         break;
 
     case gcvHAL_STALL:
         /* Stall the command queue. */
-#if gcdMULTI_GPU
-        gcmkONERROR(gckCOMMAND_Stall(Kernel->command, gcvFALSE, gcvCORE_3D_ALL_MASK));
-#else
         gcmkONERROR(gckCOMMAND_Stall(Kernel->command, gcvFALSE));
-#endif
         break;
 
     case gcvHAL_MAP_USER_MEMORY:
@@ -2037,106 +1960,6 @@ gckKERNEL_Dispatch(
         status = gcvSTATUS_NOT_SUPPORTED;
 #endif
         break;
-
-#if gcdMULTI_GPU
-    case gcvHAL_READ_REGISTER_EX:
-#if gcdREGISTER_ACCESS_FROM_USER
-        {
-            gceCHIPPOWERSTATE power;
-            gctUINT32 coreId = 0;
-            gctUINT32 coreSelect = Interface->u.ReadRegisterDataEx.coreSelect;
-
-            gcmkONERROR(gckOS_AcquireMutex(Kernel->os, Kernel->hardware->powerMutex, gcvINFINITE));
-            powerMutexAcquired = gcvTRUE;
-            gcmkONERROR(gckHARDWARE_QueryPowerManagementState(Kernel->hardware,
-                    &power));
-            if (power == gcvPOWER_ON)
-            {
-                for (; coreSelect != 0; coreSelect >>= 1, coreId++)
-                {
-                    if (coreSelect & 1UL)
-                    {
-                        /* Read a register. */
-                        gcmkONERROR(
-                            gckOS_ReadRegisterByCoreId(
-                                Kernel->os,
-                                Kernel->core,
-                                coreId,
-                                Interface->u.ReadRegisterDataEx.address,
-                                &Interface->u.ReadRegisterDataEx.data[coreId]));
-                    }
-                }
-            }
-            else
-            {
-                for (coreId = 0; coreId < gcdMULTI_GPU; coreId++)
-                {
-                    /* Chip is in power-state. */
-                    Interface->u.ReadRegisterDataEx.data[coreId] = 0;
-                }
-                status = gcvSTATUS_CHIP_NOT_READY;
-            }
-            gcmkONERROR(gckOS_ReleaseMutex(Kernel->os, Kernel->hardware->powerMutex));
-            powerMutexAcquired = gcvFALSE;
-        }
-#else
-        gctUINT32 coreId;
-
-        /* No access from user land to read registers. */
-        for (coreId = 0; coreId < gcdMULTI_GPU; coreId++)
-        {
-            Interface->u.ReadRegisterDataEx.data[coreId] = 0;
-        }
-
-        status = gcvSTATUS_NOT_SUPPORTED;
-#endif
-        break;
-
-    case gcvHAL_WRITE_REGISTER_EX:
-#if gcdREGISTER_ACCESS_FROM_USER
-        {
-            gceCHIPPOWERSTATE power;
-            gctUINT32 coreId = 0;
-            gctUINT32 coreSelect = Interface->u.WriteRegisterDataEx.coreSelect;
-
-            gcmkONERROR(gckOS_AcquireMutex(Kernel->os, Kernel->hardware->powerMutex, gcvINFINITE));
-            powerMutexAcquired = gcvTRUE;
-            gcmkONERROR(gckHARDWARE_QueryPowerManagementState(Kernel->hardware,
-                    &power));
-            if (power == gcvPOWER_ON)
-            {
-                for (; coreSelect != 0; coreSelect >>= 1, coreId++)
-                {
-                    if (coreSelect & 1UL)
-                    {
-                        /* Write a register. */
-                        gcmkONERROR(
-                            gckOS_WriteRegisterByCoreId(
-                                Kernel->os,
-                                Kernel->core,
-                                coreId,
-                                Interface->u.WriteRegisterDataEx.address,
-                                Interface->u.WriteRegisterDataEx.data[coreId]));
-                    }
-                }
-            }
-            else
-            {
-                /* Chip is in power-state. */
-                for (coreId = 0; coreId < gcdMULTI_GPU; coreId++)
-                {
-                    Interface->u.WriteRegisterDataEx.data[coreId] = 0;
-                }
-                status = gcvSTATUS_CHIP_NOT_READY;
-            }
-            gcmkONERROR(gckOS_ReleaseMutex(Kernel->os, Kernel->hardware->powerMutex));
-            powerMutexAcquired = gcvFALSE;
-        }
-#else
-        status = gcvSTATUS_NOT_SUPPORTED;
-#endif
-        break;
-#endif
 
     case gcvHAL_WRITE_REGISTER:
 #if gcdREGISTER_ACCESS_FROM_USER
@@ -2731,10 +2554,6 @@ OnError:
     /* Save status. */
     Interface->status = status;
 
-#if QNX_SINGLE_THREADED_DEBUGGING
-    gckOS_ReleaseMutex(Kernel->os, Kernel->debugMutex);
-#endif
-
     if (powerMutexAcquired == gcvTRUE)
     {
         gcmkVERIFY_OK(gckOS_ReleaseMutex(Kernel->os, Kernel->hardware->powerMutex));
@@ -2873,11 +2692,7 @@ gckKERNEL_AttachProcessEx(
         if (Kernel->vg == gcvNULL)
 #endif
         {
-#if gcdMULTI_GPU
-            status = gckEVENT_Submit(Kernel->eventObj, gcvTRUE, gcvFALSE, gcvCORE_3D_ALL_MASK);
-#else
             status = gckEVENT_Submit(Kernel->eventObj, gcvTRUE, gcvFALSE);
-#endif
 
             if (status == gcvSTATUS_INTERRUPTED && Kernel->eventObj->submitTimer)
             {
@@ -3518,37 +3333,9 @@ gckKERNEL_Recovery(
 
     /* Handle all outstanding events now. */
 #if gcdSMP
-#if gcdMULTI_GPU
-    if (Kernel->core == gcvCORE_MAJOR)
-    {
-        for (i = 0; i < gcdMULTI_GPU; i++)
-        {
-            gcmkONERROR(gckOS_AtomSet(Kernel->os, eventObj->pending3D[i], mask));
-        }
-    }
-    else
-    {
-        gcmkONERROR(gckOS_AtomSet(Kernel->os, eventObj->pending, mask));
-    }
-#else
     gcmkONERROR(gckOS_AtomSet(Kernel->os, eventObj->pending, mask));
-#endif
-#else
-#if gcdMULTI_GPU
-    if (Kernel->core == gcvCORE_MAJOR)
-    {
-        for (i = 0; i < gcdMULTI_GPU; i++)
-        {
-            eventObj->pending3D[i] = mask;
-        }
-    }
-    else
-    {
-        eventObj->pending = mask;
-    }
 #else
     eventObj->pending = mask;
-#endif
 #endif
 
 #if gcdINTERRUPT_STATISTIC

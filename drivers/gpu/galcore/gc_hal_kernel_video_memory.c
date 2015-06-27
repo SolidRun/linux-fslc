@@ -90,10 +90,6 @@ _Split(
     node->VidMem.memory    = Node->VidMem.memory;
     node->VidMem.pool      = Node->VidMem.pool;
     node->VidMem.physical  = Node->VidMem.physical;
-#ifdef __QNXNTO__
-    node->VidMem.processID = 0;
-    node->VidMem.logical   = gcvNULL;
-#endif
 
     /* Insert node behind specified node. */
     node->VidMem.next = Node->VidMem.next;
@@ -439,11 +435,6 @@ gckVIDMEM_Construct(
         node->VidMem.pool      = gcvPOOL_UNKNOWN;
 
         node->VidMem.locked    = 0;
-
-#ifdef __QNXNTO__
-        node->VidMem.processID = 0;
-        node->VidMem.logical   = gcvNULL;
-#endif
 
 #if gcdENABLE_VG
         node->VidMem.kernelVirtual = gcvNULL;
@@ -962,10 +953,6 @@ gckVIDMEM_AllocateLinear(
     /* Fill in the information. */
     node->VidMem.alignment = alignment;
     node->VidMem.memory    = Memory;
-#ifdef __QNXNTO__
-    node->VidMem.logical   = gcvNULL;
-    gcmkONERROR(gckOS_GetProcessID(&node->VidMem.processID));
-#endif
 
     /* Adjust the number of free bytes. */
     Memory->freeBytes -= node->VidMem.bytes;
@@ -1054,87 +1041,65 @@ gckVIDMEM_Free(
 
         mutexAcquired = gcvTRUE;
 
-#ifdef __QNXNTO__
-        /* Unmap the video memory. */
-        if (Node->VidMem.logical != gcvNULL)
+#if gcdENABLE_VG
+        if (Node->VidMem.kernelVirtual)
         {
-            gckKERNEL_UnmapVideoMemory(
-                    Kernel,
-                    Node->VidMem.logical,
-                    Node->VidMem.processID,
-                    Node->VidMem.bytes);
-            Node->VidMem.logical = gcvNULL;
+            gcmkTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_VIDMEM,
+                    "%s(%d) Unmap %x from kernel space.",
+                    __FUNCTION__, __LINE__,
+                    Node->VidMem.kernelVirtual);
+
+            gcmkVERIFY_OK(
+                gckOS_UnmapPhysical(memory->os,
+                                    Node->VidMem.kernelVirtual,
+                                    Node->VidMem.bytes));
+
+            Node->VidMem.kernelVirtual = gcvNULL;
+        }
+#endif
+
+        /* Check if Node is already freed. */
+        if (Node->VidMem.nextFree)
+        {
+            /* Node is alread freed. */
+            gcmkONERROR(gcvSTATUS_INVALID_DATA);
         }
 
-        /* Reset. */
-        Node->VidMem.processID = 0;
+        /* Update the number of free bytes. */
+        memory->freeBytes += Node->VidMem.bytes;
 
-        /* Don't try to re-free an already freed node. */
-        if ((Node->VidMem.nextFree == gcvNULL)
-        &&  (Node->VidMem.prevFree == gcvNULL)
+        /* Find the next free node. */
+        for (node = Node->VidMem.next;
+             node != gcvNULL && node->VidMem.nextFree == gcvNULL;
+             node = node->VidMem.next) ;
+
+        /* Insert this node in the free list. */
+        Node->VidMem.nextFree = node;
+        Node->VidMem.prevFree = node->VidMem.prevFree;
+
+        Node->VidMem.prevFree->VidMem.nextFree =
+        node->VidMem.prevFree                  = Node;
+
+        /* Is the next node a free node and not the sentinel? */
+        if ((Node->VidMem.next == Node->VidMem.nextFree)
+        &&  (Node->VidMem.next->VidMem.bytes != 0)
         )
-#endif
         {
-#if gcdENABLE_VG
-            if (Node->VidMem.kernelVirtual)
-            {
-                gcmkTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_VIDMEM,
-                        "%s(%d) Unmap %x from kernel space.",
-                        __FUNCTION__, __LINE__,
-                        Node->VidMem.kernelVirtual);
+            /* Merge this node with the next node. */
+            gcmkONERROR(_Merge(memory->os, node = Node));
+            gcmkASSERT(node->VidMem.nextFree != node);
+            gcmkASSERT(node->VidMem.prevFree != node);
+        }
 
-                gcmkVERIFY_OK(
-                    gckOS_UnmapPhysical(memory->os,
-                                        Node->VidMem.kernelVirtual,
-                                        Node->VidMem.bytes));
-
-                Node->VidMem.kernelVirtual = gcvNULL;
-            }
-#endif
-
-            /* Check if Node is already freed. */
-            if (Node->VidMem.nextFree)
-            {
-                /* Node is alread freed. */
-                gcmkONERROR(gcvSTATUS_INVALID_DATA);
-            }
-
-            /* Update the number of free bytes. */
-            memory->freeBytes += Node->VidMem.bytes;
-
-            /* Find the next free node. */
-            for (node = Node->VidMem.next;
-                 node != gcvNULL && node->VidMem.nextFree == gcvNULL;
-                 node = node->VidMem.next) ;
-
-            /* Insert this node in the free list. */
-            Node->VidMem.nextFree = node;
-            Node->VidMem.prevFree = node->VidMem.prevFree;
-
-            Node->VidMem.prevFree->VidMem.nextFree =
-            node->VidMem.prevFree                  = Node;
-
-            /* Is the next node a free node and not the sentinel? */
-            if ((Node->VidMem.next == Node->VidMem.nextFree)
-            &&  (Node->VidMem.next->VidMem.bytes != 0)
-            )
-            {
-                /* Merge this node with the next node. */
-                gcmkONERROR(_Merge(memory->os, node = Node));
-                gcmkASSERT(node->VidMem.nextFree != node);
-                gcmkASSERT(node->VidMem.prevFree != node);
-            }
-
-            /* Is the previous node a free node and not the sentinel? */
-            if ((Node->VidMem.prev == Node->VidMem.prevFree)
-            &&  (Node->VidMem.prev->VidMem.bytes != 0)
-            )
-            {
-                /* Merge this node with the previous node. */
-                gcmkONERROR(_Merge(memory->os, node = Node->VidMem.prev));
-                gcmkASSERT(node->VidMem.nextFree != node);
-                gcmkASSERT(node->VidMem.prevFree != node);
-            }
+        /* Is the previous node a free node and not the sentinel? */
+        if ((Node->VidMem.prev == Node->VidMem.prevFree)
+        &&  (Node->VidMem.prev->VidMem.bytes != 0)
+        )
+        {
+            /* Merge this node with the previous node. */
+            gcmkONERROR(_Merge(memory->os, node = Node->VidMem.prev));
+            gcmkASSERT(node->VidMem.nextFree != node);
+            gcmkASSERT(node->VidMem.prevFree != node);
         }
 
         /* Release the mutex. */

@@ -518,10 +518,6 @@ struct _gckKERNEL
     gctBOOL                     profileCleanRegister;
 #endif
 
-#ifdef QNX_SINGLE_THREADED_DEBUGGING
-    gctPOINTER                  debugMutex;
-#endif
-
     /* Database management. */
     gckDB                       db;
     gctBOOL                     dbCreated;
@@ -704,11 +700,6 @@ typedef struct _gcsEVENT
     /* Process ID owning the event. */
     gctUINT32                   processID;
 
-#ifdef __QNXNTO__
-    /* Kernel. */
-    gckKERNEL                   kernel;
-#endif
-
     gctBOOL                     fromKernel;
 }
 gcsEVENT;
@@ -722,11 +713,6 @@ typedef struct _gcsEVENT_QUEUE
 
     /* Source of the event. */
     gceKERNEL_WHERE             source;
-
-#if gcdMULTI_GPU
-    /* Which chip(s) of the event */
-    gceCORE_3D_MASK             chipEnable;
-#endif
 
     /* Pointer to head of event queue. */
     gcsEVENT_PTR                head;
@@ -777,22 +763,9 @@ struct _gckEVENT
 
     /* Pending events. */
 #if gcdSMP
-#if gcdMULTI_GPU
-    gctPOINTER                  pending3D[gcdMULTI_GPU];
-    gctPOINTER                  pending3DMask[gcdMULTI_GPU];
-    gctPOINTER                  pendingMask;
-#endif
     gctPOINTER                  pending;
 #else
-#if gcdMULTI_GPU
-    volatile gctUINT            pending3D[gcdMULTI_GPU];
-    volatile gctUINT            pending3DMask[gcdMULTI_GPU];
-    volatile gctUINT            pendingMask;
-#endif
     volatile gctUINT            pending;
-#endif
-#if gcdMULTI_GPU
-    gctUINT32                   busy;
 #endif
 
     /* List of free event structures and its mutex. */
@@ -877,11 +850,6 @@ typedef union _gcuVIDMEM_NODE
         gctSIZE_T               offset;
         gctSIZE_T               bytes;
         gctUINT32               alignment;
-
-#ifdef __QNXNTO__
-        /* Client virtual address. */
-        gctPOINTER              logical;
-#endif
 
         /* Locked counter. */
         gctINT32                locked;

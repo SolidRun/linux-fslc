@@ -1784,24 +1784,6 @@ _Print(
 ********************************* Debug Macros *********************************
 \******************************************************************************/
 
-#ifdef __QNXNTO__
-
-extern volatile unsigned g_nQnxInIsrs;
-
-#define gcmDEBUGPRINT(ArgumentSize, CopyMessage, Message) \
-{ \
-    if (atomic_add_value(&g_nQnxInIsrs, 1) == 0) \
-    { \
-        gctARGUMENTS __arguments__; \
-        gcmkARGUMENTS_START(__arguments__, Message); \
-        _Print(ArgumentSize, CopyMessage, Message, &__arguments__); \
-        gcmkARGUMENTS_END(__arguments__); \
-    } \
-    atomic_sub(&g_nQnxInIsrs, 1); \
-}
-
-#else
-
 #define gcmDEBUGPRINT(ArgumentSize, CopyMessage, Message) \
 { \
     gctARGUMENTS __arguments__; \
@@ -1810,7 +1792,6 @@ extern volatile unsigned g_nQnxInIsrs;
     gcmkARGUMENTS_END(__arguments__); \
 }
 
-#endif
 
 /******************************************************************************\
 ********************************** Debug Code **********************************

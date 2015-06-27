@@ -1224,9 +1224,6 @@ typedef enum _gceHARDWARE_TYPE
     gcvHARDWARE_3D      = 0x01,
     gcvHARDWARE_2D      = 0x02,
     gcvHARDWARE_VG      = 0x04,
-#if gcdMULTI_GPU_AFFINITY
-    gcvHARDWARE_OCL     = 0x05,
-#endif
     gcvHARDWARE_3D2D    = gcvHARDWARE_3D | gcvHARDWARE_2D
 }
 gceHARDWARE_TYPE;

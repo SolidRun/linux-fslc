@@ -106,9 +106,6 @@ _IdentifyHardware(
     gctUINT32 numConstants = 0;
     gctUINT32 bufferSize = 0;
     gctUINT32 varyingsCount = 0;
-#if gcdMULTI_GPU
-    gctUINT32 gpuCoreCount = 0;
-#endif
 
     gcmkHEADER_ARG("Os=0x%x", Os);
 
@@ -372,9 +369,6 @@ _IdentifyHardware(
                                  &specs3));
 
         varyingsCount          = (((((gctUINT32) (specs3)) >> (0 ? 8:4)) & ((gctUINT32) ((((1 ? 8:4) - (0 ? 8:4) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 8:4) - (0 ? 8:4) + 1)))))) );
-#if gcdMULTI_GPU
-        gpuCoreCount           = (((((gctUINT32) (specs3)) >> (0 ? 2:0)) & ((gctUINT32) ((((1 ? 2:0) - (0 ? 2:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1)))))) );
-#endif
 
         /* Read gcChipSpecs4 register. */
         gcmkONERROR(
@@ -578,14 +572,6 @@ _IdentifyHardware(
             Identity->chip2DControl |= 0x200;
         }
     }
-
-#if gcdMULTI_GPU
-#if gcdMULTI_GPU > 1
-     Identity->gpuCoreCount = gpuCoreCount + 1;
-#else
-     Identity->gpuCoreCount = 1;
-#endif
-#endif
 
     /* Success. */
     gcmkFOOTER();
@@ -940,9 +926,6 @@ gckHARDWARE_Construct(
     gckHARDWARE hardware = gcvNULL;
     gctUINT16 data = 0xff00;
     gctPOINTER pointer = gcvNULL;
-#if gcdMULTI_GPU_AFFINITY
-    gctUINT32 control;
-#endif
 
     gcmkHEADER_ARG("Os=0x%x", Os);
 
@@ -990,11 +973,7 @@ gckHARDWARE_Construct(
         break;
 
     default:
-#if gcdMULTI_GPU_AFFINITY
-        hardware->type = (Core == gcvCORE_MAJOR) ? gcvHARDWARE_3D : gcvHARDWARE_OCL;
-#else
         hardware->type = gcvHARDWARE_3D;
-#endif
 
         if(hardware->identity.chipModel == gcv880 && hardware->identity.chipRevision == 0x5107)
         {
@@ -1026,25 +1005,6 @@ gckHARDWARE_Construct(
         gcmkTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_HARDWARE,
             "_ResetGPU failed: status=%d\n", status);
     }
-
-#if gcdMULTI_GPU
-    gcmkONERROR(gckOS_WriteRegisterEx(Os,
-                                      Core,
-                                      0x0055C,
-#if gcdDISABLE_FE_L2
-                                      0x00FFFFFF));
-#else
-                                      0x00FFFF05));
-#endif
-
-#elif gcdMULTI_GPU_AFFINITY
-    control = ((((gctUINT32) (0x00FF0A05)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 27:27) - (0 ? 27:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 27:27) - (0 ? 27:27) + 1))))))) << (0 ? 27:27))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ? 27:27) - (0 ? 27:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 27:27) - (0 ? 27:27) + 1))))))) << (0 ? 27:27)));
-
-    gcmkONERROR(gckOS_WriteRegisterEx(Os,
-                                      Core,
-                                      0x0055C,
-                                      control));
-#endif
 
     hardware->powerMutex = gcvNULL;
 
@@ -1110,13 +1070,11 @@ gckHARDWARE_Construct(
     /* Disable profiler by default */
     hardware->gpuProfiler = gcvFALSE;
 
-#if defined(LINUX) || defined(__QNXNTO__) || defined(UNDERCE)
     if (hardware->mmuVersion)
     {
         hardware->endAfterFlushMmuCache = gcvTRUE;
     }
     else
-#endif
     {
         hardware->endAfterFlushMmuCache = gcvFALSE;
     }
@@ -1836,9 +1794,6 @@ gckHARDWARE_QueryChipIdentity(
     Identity->bufferSize             = Hardware->identity.bufferSize;
     Identity->varyingsCount          = Hardware->identity.varyingsCount;
     Identity->superTileMode          = Hardware->identity.superTileMode;
-#if gcdMULTI_GPU
-    Identity->gpuCoreCount           = Hardware->identity.gpuCoreCount;
-#endif
     Identity->chip2DControl          = Hardware->identity.chip2DControl;
 
     Identity->productID              = Hardware->identity.productID;
@@ -2058,12 +2013,8 @@ gckHARDWARE_WaitLink(
     gcmkVERIFY_OBJECT(Hardware, gcvOBJ_HARDWARE);
     gcmkVERIFY_ARGUMENT((Logical != gcvNULL) || (Bytes != gcvNULL));
 
-#if gcdMULTI_GPU && !gcdDISABLE_FE_L2
-    bytes = gcmALIGN(Offset + 40, 8) - Offset;
-#else
     /* Compute number of bytes required. */
     bytes = gcmALIGN(Offset + 16, 8) - Offset;
-#endif
     /* Cast the input pointer. */
     logical = (gctUINT32_PTR) Logical;
 
@@ -2087,45 +2038,6 @@ gckHARDWARE_WaitLink(
             = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 31:27) - (0 ? 31:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27))) | (((gctUINT32) (0x07 & ((gctUINT32) ((((1 ? 31:27) - (0 ? 31:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)))
             | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 15:0) - (0 ? 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0))) | (((gctUINT32) ((gctUINT32) (waitCount) & ((gctUINT32) ((((1 ? 15:0) - (0 ? 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));
 
-#if gcdMULTI_GPU && !gcdDISABLE_FE_L2
-        logical[2] = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 31:27) - (0 ? 31:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27))) | (((gctUINT32) (0x0D & ((gctUINT32) ((((1 ? 31:27) - (0 ? 31:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)))
-                   | gcvCORE_3D_0_MASK;
-
-        logical[3] = 0;
-
-        /* LoadState(AQFlush, 1), flush. */
-        logical[4] = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 31:27) - (0 ? 31:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 31:27) - (0 ? 31:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)))
-                   | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 15:0) - (0 ? 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0))) | (((gctUINT32) ((gctUINT32) (0x0E03) & ((gctUINT32) ((((1 ? 15:0) - (0 ? 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)))
-                   | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 25:16) - (0 ? 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ? 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ? 25:16) - (0 ? 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ? 25:16)));
-
-        logical[5] = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 6:6) - (0 ? 6:6) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 6:6) - (0 ? 6:6) + 1))))))) << (0 ? 6:6))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 6:6) - (0 ? 6:6) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 6:6) - (0 ? 6:6) + 1))))))) << (0 ? 6:6)));
-
-        logical[6] = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 31:27) - (0 ? 31:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27))) | (((gctUINT32) (0x0D & ((gctUINT32) ((((1 ? 31:27) - (0 ? 31:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)))
-                   | gcvCORE_3D_ALL_MASK;
-
-        logical[7] = 0;
-
-        /* Append LINK(2, address). */
-        logical[8] = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 31:27) - (0 ? 31:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27))) | (((gctUINT32) (0x08 & ((gctUINT32) ((((1 ? 31:27) - (0 ? 31:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)))
-                   | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 15:0) - (0 ? 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0))) | (((gctUINT32) ((gctUINT32) (bytes >> 3) & ((gctUINT32) ((((1 ? 15:0) - (0 ? 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ? 15:0)));
-
-        logical[9] = address;
-
-        gcmkTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_HARDWARE,
-            "0x%08x: WAIT %u", address, waitCount
-            );
-
-        gcmkTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_HARDWARE,
-                        "0x%x: FLUSH 0x%x", address + 8, logical[3]);
-
-        gcmkTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_HARDWARE,
-            "0x%08x: LINK 0x%08x, #%lu",
-            address + 16, address, bytes
-            );
-#else
-
         /* Append LINK(2, address). */
         logical[2]
             = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 31:27) - (0 ? 31:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27))) | (((gctUINT32) (0x08 & ((gctUINT32) ((((1 ? 31:27) - (0 ? 31:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)))
@@ -2143,7 +2055,6 @@ gckHARDWARE_WaitLink(
             "0x%08x: LINK 0x%08x, #%lu",
             address + 8, address, bytes
             );
-#endif
         if (WaitOffset != gcvNULL)
         {
             /* Return the offset pointer to WAIT command. */
@@ -2153,11 +2064,7 @@ gckHARDWARE_WaitLink(
         if (WaitSize != gcvNULL)
         {
             /* Return number of bytes used by the WAIT command. */
-#if gcdMULTI_GPU && !gcdDISABLE_FE_L2
-            *WaitSize = 32;
-#else
             *WaitSize = 8;
-#endif
         }
     }
 
@@ -2261,57 +2168,6 @@ OnError:
     gcmkFOOTER();
     return status;
 }
-
-#if gcdMULTI_GPU
-gceSTATUS
-gckHARDWARE_ChipEnable(
-    IN gckHARDWARE Hardware,
-    IN gctPOINTER Logical,
-    IN gceCORE_3D_MASK ChipEnable,
-    IN OUT gctSIZE_T * Bytes
-    )
-{
-    gctUINT32_PTR logical = (gctUINT32_PTR) Logical;
-    gceSTATUS status;
-
-    gcmkHEADER_ARG("Hardware=0x%x Logical=0x%x ChipEnable=0x%x *Bytes=%lu",
-                   Hardware, Logical, ChipEnable, gcmOPT_VALUE(Bytes));
-
-    /* Verify the arguments. */
-    gcmkVERIFY_OBJECT(Hardware, gcvOBJ_HARDWARE);
-    gcmkVERIFY_ARGUMENT((Logical == gcvNULL) || (Bytes != gcvNULL));
-
-    if (Logical != gcvNULL)
-    {
-        if (*Bytes < 8)
-        {
-            /* Command queue too small. */
-            gcmkONERROR(gcvSTATUS_BUFFER_TOO_SMALL);
-        }
-
-        /* Append CHIPENABLE. */
-        logical[0] = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 31:27) - (0 ? 31:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27))) | (((gctUINT32) (0x0D & ((gctUINT32) ((((1 ? 31:27) - (0 ? 31:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)))
-                   | ChipEnable;
-
-        gcmkTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_HARDWARE, "0x%x: CHIPENABLE 0x%x", Logical, ChipEnable);
-    }
-
-    if (Bytes != gcvNULL)
-    {
-        /* Return number of bytes required by the CHIPENABLE command. */
-        *Bytes = 8;
-    }
-
-    /* Success. */
-    gcmkFOOTER_ARG("*Bytes=%lu", gcmOPT_VALUE(Bytes));
-    return gcvSTATUS_OK;
-
-OnError:
-    /* Return the status. */
-    gcmkFOOTER();
-    return status;
-}
-#endif
 
 /*******************************************************************************
 **
@@ -2439,10 +2295,6 @@ gckHARDWARE_Event(
     gcmkVERIFY_OBJECT(Hardware, gcvOBJ_HARDWARE);
     gcmkVERIFY_ARGUMENT((Logical == gcvNULL) || (Bytes != gcvNULL));
     gcmkVERIFY_ARGUMENT(Event < 32);
-
-#if gcdMULTI_GPU
-    if (FromWhere == gcvKERNEL_COMMAND) FromWhere = gcvKERNEL_PIXEL;
-#endif
 
     /* Determine the size of the command. */
 
@@ -2825,18 +2677,10 @@ gckHARDWARE_UpdateQueueTail(
         gckOS_MemoryBarrier(Hardware->os, Logical));
 
     /* Notify gckKERNEL object of change. */
-#if gcdMULTI_GPU
-    gcmkONERROR(
-        gckKERNEL_Notify(Hardware->kernel,
-                         0,
-                         gcvNOTIFY_COMMAND_QUEUE,
-                         gcvFALSE));
-#else
     gcmkONERROR(
         gckKERNEL_Notify(Hardware->kernel,
                          gcvNOTIFY_COMMAND_QUEUE,
                          gcvFALSE));
-#endif
 
     if (status == gcvSTATUS_CHIP_NOT_READY)
     {
@@ -2958,9 +2802,6 @@ OnError:
 gceSTATUS
 gckHARDWARE_Interrupt(
     IN gckHARDWARE Hardware,
-#if gcdMULTI_GPU
-    IN gctUINT CoreId,
-#endif
     IN gctBOOL InterruptValid
     )
 {
@@ -2980,31 +2821,11 @@ gckHARDWARE_Interrupt(
     if (InterruptValid)
     {
         /* Read AQIntrAcknowledge register. */
-#if gcdMULTI_GPU
-        if (Hardware->core == gcvCORE_MAJOR)
-        {
-            gcmkONERROR(
-                gckOS_ReadRegisterByCoreId(Hardware->os,
-                                           Hardware->core,
-                                           CoreId,
-                                           0x00010,
-                                           &data));
-        }
-        else
-        {
-            gcmkONERROR(
-                gckOS_ReadRegisterEx(Hardware->os,
-                                     Hardware->core,
-                                     0x00010,
-                                     &data));
-        }
-#else
         gcmkONERROR(
             gckOS_ReadRegisterEx(Hardware->os,
                                  Hardware->core,
                                  0x00010,
                                  &data));
-#endif
 
         if (data == 0)
         {
@@ -3020,9 +2841,6 @@ gckHARDWARE_Interrupt(
 
             /* Inform gckEVENT of the interrupt. */
             status = gckEVENT_Interrupt(eventObj,
-#if gcdMULTI_GPU
-                                        CoreId,
-#endif
                                         data);
         }
     }
@@ -3950,11 +3768,7 @@ gckHARDWARE_ConfigMMU(
 
     if (WaitLinkBytes != gcvNULL)
     {
-#if gcdMULTI_GPU
-        *WaitLinkBytes = 40;
-#else
         *WaitLinkBytes = 4 * 4;
-#endif
     }
 
     gcmkFOOTER_NO();
@@ -4149,14 +3963,6 @@ gckHARDWARE_Flush(
     {
         flush |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 3:3) - (0 ? 3:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 3:3) - (0 ? 3:3) + 1))))))) << (0 ? 3:3))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 3:3) - (0 ? 3:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 3:3) - (0 ? 3:3) + 1))))))) << (0 ? 3:3)));
     }
-
-#if gcdMULTI_GPU
-    /* Flush L2 cache. */
-    if ((Flush & gcvFLUSH_L2) && (pipe == 0x0))
-    {
-        flush |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 6:6) - (0 ? 6:6) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 6:6) - (0 ? 6:6) + 1))))))) << (0 ? 6:6))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 6:6) - (0 ? 6:6) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 6:6) - (0 ? 6:6) + 1))))))) << (0 ? 6:6)));
-    }
-#endif
 
     /* Determine reserve bytes. */
     if (flush)
@@ -4934,11 +4740,7 @@ gckHARDWARE_SetPowerManagementState(
             commitEntered = gcvFALSE;
 
             /* Wait to finish all commands. */
-#if gcdMULTI_GPU
-            gcmkONERROR(gckCOMMAND_Stall(command, gcvTRUE, gcvCORE_3D_ALL_MASK));
-#else
             gcmkONERROR(gckCOMMAND_Stall(command, gcvTRUE));
-#endif
         }
     }
 
@@ -5544,11 +5346,6 @@ gckHARDWARE_QueryIdle(
     gceSTATUS status;
     gctUINT32 idle, address;
     gctBOOL   isIdle;
-#if gcdMULTI_GPU > 1
-    gctUINT32 idle3D1 = 0;
-    gctUINT32 address3D1;
-    gctBOOL   isIdle3D1 = gcvFALSE;
-#endif
 
 #if gcdINTERRUPT_STATISTIC
     gctINT32 pendingInterrupt;
@@ -5564,9 +5361,6 @@ gckHARDWARE_QueryIdle(
     if (Hardware->chipPowerState != gcvPOWER_ON)
     {
         isIdle = gcvTRUE;
-#if gcdMULTI_GPU > 1
-        isIdle3D1 = gcvTRUE;
-#endif
     }
 
     else
@@ -5574,18 +5368,6 @@ gckHARDWARE_QueryIdle(
         /* Read idle register. */
         gcmkONERROR(
             gckOS_ReadRegisterEx(Hardware->os, Hardware->core, 0x00004, &idle));
-
-#if gcdMULTI_GPU > 1
-        if (Hardware->core == gcvCORE_MAJOR)
-        {
-            gcmkONERROR(
-                gckOS_ReadRegisterByCoreId(Hardware->os,
-                                           Hardware->core,
-                                           gcvCORE_3D_1_ID,
-                                           0x00004,
-                                           &idle3D1));
-        }
-#endif
 
         /* Pipe must be idle. */
         if (((((((gctUINT32) (idle)) >> (0 ? 1:1)) & ((gctUINT32) ((((1 ? 1:1) - (0 ? 1:1) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 1:1) - (0 ? 1:1) + 1)))))) ) != 1)
@@ -5615,11 +5397,7 @@ gckHARDWARE_QueryIdle(
 
             /* Test if address is inside the last WAIT/LINK sequence. */
             if ((address >= Hardware->lastWaitLink)
-#if gcdMULTI_GPU
-            &&  (address <= Hardware->lastWaitLink + 40)
-#else
             &&  (address <= Hardware->lastWaitLink + 16)
-#endif
             )
             {
                 /* FE is in last WAIT/LINK and the pipe is idle. */
@@ -5632,50 +5410,6 @@ gckHARDWARE_QueryIdle(
             }
 #endif
         }
-
-#if gcdMULTI_GPU > 1
-        if (Hardware->core == gcvCORE_MAJOR)
-        {
-            /* Pipe must be idle. */
-            if (((((((gctUINT32) (idle3D1)) >> (0 ? 1:1)) & ((gctUINT32) ((((1 ? 1:1) - (0 ? 1:1) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 1:1) - (0 ? 1:1) + 1)))))) ) != 1)
-                ||  ((((((gctUINT32) (idle3D1)) >> (0 ? 3:3)) & ((gctUINT32) ((((1 ? 3:3) - (0 ? 3:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 3:3) - (0 ? 3:3) + 1)))))) ) != 1)
-                ||  ((((((gctUINT32) (idle3D1)) >> (0 ? 4:4)) & ((gctUINT32) ((((1 ? 4:4) - (0 ? 4:4) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 4:4) - (0 ? 4:4) + 1)))))) ) != 1)
-                ||  ((((((gctUINT32) (idle3D1)) >> (0 ? 5:5)) & ((gctUINT32) ((((1 ? 5:5) - (0 ? 5:5) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 5:5) - (0 ? 5:5) + 1)))))) ) != 1)
-                ||  ((((((gctUINT32) (idle3D1)) >> (0 ? 6:6)) & ((gctUINT32) ((((1 ? 6:6) - (0 ? 6:6) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 6:6) - (0 ? 6:6) + 1)))))) ) != 1)
-                ||  ((((((gctUINT32) (idle3D1)) >> (0 ? 7:7)) & ((gctUINT32) ((((1 ? 7:7) - (0 ? 7:7) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:7) - (0 ? 7:7) + 1)))))) ) != 1)
-                ||  ((((((gctUINT32) (idle3D1)) >> (0 ? 2:2)) & ((gctUINT32) ((((1 ? 2:2) - (0 ? 2:2) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 2:2) - (0 ? 2:2) + 1)))))) ) != 1)
-            )
-            {
-                /* Something is busy. */
-                isIdle3D1 = gcvFALSE;
-            }
-
-            else
-            {
-                /* Read the current FE address. */
-                gcmkONERROR(gckOS_ReadRegisterByCoreId(Hardware->os,
-                                                       Hardware->core,
-                                                       gcvCORE_3D_1_ID,
-                                                       0x00664,
-                                                       &address3D1));
-
-                /* Test if address is inside the last WAIT/LINK sequence. */
-                if ((address3D1 >= Hardware->lastWaitLink)
-                    &&  (address3D1 <= Hardware->lastWaitLink + 40)
-                )
-                {
-                    /* FE is in last WAIT/LINK and the pipe is idle. */
-                    isIdle3D1 = gcvTRUE;
-                }
-                else
-                {
-                    /* FE is not in WAIT/LINK yet. */
-                    isIdle3D1 = gcvFALSE;
-                }
-            }
-        }
-#endif
-
     }
 
 #if gcdINTERRUPT_STATISTIC
@@ -5691,16 +5425,7 @@ gckHARDWARE_QueryIdle(
     }
 #endif
 
-#if gcdMULTI_GPU > 1
-    if (Hardware->core == gcvCORE_MAJOR)
-    {
-        *IsIdle = (isIdle & isIdle3D1);
-    }
-    else
-#endif
-    {
-        *IsIdle = isIdle;
-    }
+    *IsIdle = isIdle;
 
     /* Success. */
     gcmkFOOTER_NO();
@@ -6580,22 +6305,6 @@ _ResetGPU(
             continue;
         }
 
-#if gcdMULTI_GPU > 1
-        if (Core == gcvCORE_MAJOR)
-        {
-            /* Read idle register. */
-            gcmkONERROR(gckOS_ReadRegisterByCoreId(Os,
-                                                   Core,
-                                                   gcvCORE_3D_1_ID,
-                                                   0x00004,
-                                                   &idle));
-
-            if ((((((gctUINT32) (idle)) >> (0 ? 0:0)) & ((gctUINT32) ((((1 ? 0:0) - (0 ? 0:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 0:0) - (0 ? 0:0) + 1)))))) ) == 0)
-            {
-                continue;
-            }
-        }
-#endif
         /* Read reset register. */
         gcmkONERROR(gckOS_ReadRegisterEx(Os,
                                          Core,
@@ -6609,24 +6318,6 @@ _ResetGPU(
             continue;
         }
 
-#if gcdMULTI_GPU > 1
-        if (Core == gcvCORE_MAJOR)
-        {
-            /* Read reset register. */
-            gcmkONERROR(gckOS_ReadRegisterByCoreId(Os,
-                                                   Core,
-                                                   gcvCORE_3D_1_ID,
-                                                   0x00000,
-                                                   &control));
-
-            if (((((((gctUINT32) (control)) >> (0 ? 16:16)) & ((gctUINT32) ((((1 ? 16:16) - (0 ? 16:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 16:16) - (0 ? 16:16) + 1)))))) ) == 0)
-                ||  ((((((gctUINT32) (control)) >> (0 ? 17:17)) & ((gctUINT32) ((((1 ? 17:17) - (0 ? 17:17) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 17:17) - (0 ? 17:17) + 1)))))) ) == 0)
-            )
-            {
-                continue;
-            }
-        }
-#endif
         /* GPU is idle. */
         break;
     }

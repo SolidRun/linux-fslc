@@ -727,11 +727,6 @@ _ScheduleTasks(
         gctINT32 interrupt;
         gctUINT8_PTR eventCommand;
 
-#ifdef __QNXNTO__
-        gcsTASK_PTR oldUserTask = gcvNULL;
-        gctPOINTER pointer;
-#endif
-
         /* Nothing to schedule? */
         if (TaskTable->size == 0)
         {
@@ -831,18 +826,6 @@ _ScheduleTasks(
                 {
                     gcsTASK_HEADER_PTR taskHeader;
 
-#ifdef __QNXNTO__
-                    oldUserTask = userTask;
-
-                    gcmkERR_BREAK(gckOS_MapUserPointer(
-                        Command->os,
-                        oldUserTask,
-                        0,
-                        &pointer));
-
-                    userTask = pointer;
-#endif
-
                     taskHeader = (gcsTASK_HEADER_PTR) (userTask + 1);
 
                     gcmkVERIFY_OK(_RemoveRecordFromProcesDB(Command, taskHeader));
@@ -854,14 +837,6 @@ _ScheduleTasks(
                         userTask->size
                         );
 
-#ifdef __QNXNTO__
-                    if (taskHeader->id == gcvTASK_SIGNAL)
-                    {
-                        ((gcsTASK_SIGNAL_PTR)taskHeader)->coid  = TaskTable->coid;
-                        ((gcsTASK_SIGNAL_PTR)taskHeader)->rcvid = TaskTable->rcvid;
-                    }
-#endif
-
                     /* Copy the task data. */
                     gcmkVERIFY_OK(gckOS_MemCopy(
                         kernelTask, taskHeader, userTask->size
@@ -870,14 +845,6 @@ _ScheduleTasks(
                     /* Advance to the next task. */
                     kernelTask += userTask->size;
                     userTask    = userTask->next;
-
-#ifdef __QNXNTO__
-                    gcmkERR_BREAK(gckOS_UnmapUserPointer(
-                        Command->os,
-                        oldUserTask,
-                        0,
-                        pointer));
-#endif
                 }
                 while (userTask != gcvNULL);
 
@@ -1546,15 +1513,9 @@ _TaskSignal(
 
 
         /* Map the signal into kernel space. */
-#ifdef __QNXNTO__
-        gcmkERR_BREAK(gckOS_UserSignal(
-            Command->os, task->signal, task->rcvid, task->coid
-            ));
-#else
         gcmkERR_BREAK(gckOS_UserSignal(
             Command->os, task->signal, task->process
             ));
-#endif /* __QNXNTO__ */
 
         /* Update the reference counter. */
         TaskHeader->container->referenceCount -= 1;
@@ -3430,14 +3391,6 @@ gckVGCOMMAND_Commit(
 
     gceSTATUS status, last;
 
-#ifdef __QNXNTO__
-    gcsVGCONTEXT_PTR userContext = gcvNULL;
-    gctBOOL userContextMapped = gcvFALSE;
-    gcsTASK_MASTER_TABLE_PTR userTaskTable = gcvNULL;
-    gctBOOL userTaskTableMapped = gcvFALSE;
-    gctPOINTER pointer = gcvNULL;
-#endif
-
     gcmkHEADER_ARG("Command=0x%x Context=0x%x Queue=0x%x EntryCount=0x%x TaskTable=0x%x",
         Command, Context, Queue, EntryCount, TaskTable);
 
@@ -3462,38 +3415,6 @@ gckVGCOMMAND_Commit(
         gctBOOL previousDynamic;
         gctBOOL previousExecuted;
         gctUINT controlIndex;
-
-#ifdef __QNXNTO__
-        /* Map the context into the kernel space. */
-        userContext = Context;
-
-        gcmkERR_BREAK(gckOS_MapUserPointer(
-            Command->os,
-            userContext,
-            gcmSIZEOF(*userContext),
-            &pointer));
-
-        Context = pointer;
-
-        userContextMapped = gcvTRUE;
-
-        /* Map the taskTable into the kernel space. */
-        userTaskTable = TaskTable;
-
-        gcmkERR_BREAK(gckOS_MapUserPointer(
-            Command->os,
-            userTaskTable,
-            gcmSIZEOF(*userTaskTable),
-            &pointer));
-
-        TaskTable = pointer;
-
-        userTaskTableMapped = gcvTRUE;
-
-        /* Update the signal info. */
-        TaskTable->coid  = Context->coid;
-        TaskTable->rcvid = Context->rcvid;
-#endif
 
         gcmkERR_BREAK(gckVGHARDWARE_SetPowerManagementState(
             Command->hardware, gcvPOWER_ON_AUTO
@@ -3547,17 +3468,9 @@ gckVGCOMMAND_Commit(
                 Queue      += 1;
 
                 /* Set the signal to avoid user waiting. */
-#ifdef __QNXNTO__
-                gcmkERR_BREAK(gckOS_UserSignal(
-                    Command->os, Context->signal, Context->rcvid, Context->coid
-                    ));
-#else
                 gcmkERR_BREAK(gckOS_UserSignal(
                     Command->os, Context->signal, Context->process
                     ));
-
-#endif /* __QNXNTO__ */
-
             }
             else
             {
@@ -3756,28 +3669,6 @@ gckVGCOMMAND_Commit(
             Command->os, Command->powerSemaphore));
     }
     while (gcvFALSE);
-
-#ifdef __QNXNTO__
-    if (userContextMapped)
-    {
-        /* Unmap the user context. */
-        gcmkVERIFY_OK(gckOS_UnmapUserPointer(
-            Command->os,
-            userContext,
-            gcmSIZEOF(*userContext),
-            Context));
-    }
-
-    if (userTaskTableMapped)
-    {
-        /* Unmap the user taskTable. */
-        gcmkVERIFY_OK(gckOS_UnmapUserPointer(
-            Command->os,
-            userTaskTable,
-            gcmSIZEOF(*userTaskTable),
-            TaskTable));
-    }
-#endif
 
     gcmkFOOTER();
     /* Return status. */

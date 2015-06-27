@@ -700,27 +700,6 @@
 #endif
 
 /*
-    gcdMULTI_GPU
-
-    Enable/disable multi-GPU support.
-    0      : Disable multi-GPU support
-    1      : Enable one of the 3D cores
-    [2..X] : Number of 3D GPU Cores
-*/
-#ifndef gcdMULTI_GPU
-#   define gcdMULTI_GPU                         0
-#endif
-
-/*
-    gcdMULTI_GPU_AFFINITY
-
-    Enable/disable the binding of a context to one GPU
-*/
-#ifndef gcdMULTI_GPU_AFFINITY
-#   define gcdMULTI_GPU_AFFINITY                0
-#endif
-
-/*
     gcdPOWEROFF_TIMEOUT
 
         When non-zero, GPU will power off automatically from
@@ -729,13 +708,6 @@
  */
 #ifndef gcdPOWEROFF_TIMEOUT
 #   define gcdPOWEROFF_TIMEOUT                  300
-#endif
-
-/*
-    QNX_SINGLE_THREADED_DEBUGGING
-*/
-#ifndef QNX_SINGLE_THREADED_DEBUGGING
-#   define QNX_SINGLE_THREADED_DEBUGGING        0
 #endif
 
 /*
@@ -759,11 +731,7 @@
 
 */
 #ifndef gcdSMP
-#ifdef __APPLE__
-#   define gcdSMP                               1
-#else
 #   define gcdSMP                               0
-#endif
 #endif
 
 /*

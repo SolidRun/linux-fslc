@@ -490,16 +490,7 @@ _AllowAccess(
         return gcvTRUE;
     }
 
-#if gcdMULTI_GPU
-    if (Core == gcvCORE_MAJOR)
-    {
-        data = readl((gctUINT8 *)Os->device->registerBases[gcvCORE_3D_0_ID] + 0x0);
-    }
-    else
-#endif
-    {
-        data = readl((gctUINT8 *)Os->device->registerBases[Core] + 0x0);
-    }
+    data = readl((gctUINT8 *)Os->device->registerBases[Core] + 0x0);
 
     if ((data & 0x3) == 0x3)
     {
@@ -1893,9 +1884,7 @@ gckOS_ReadRegisterEx(
 
     /* Verify the arguments. */
     gcmkVERIFY_OBJECT(Os, gcvOBJ_OS);
-#if !gcdMULTI_GPU
     gcmkVERIFY_ARGUMENT(Address < Os->device->requestedRegisterMemSizes[Core]);
-#endif
     gcmkVERIFY_ARGUMENT(Data != gcvNULL);
 
     if (!in_interrupt())
@@ -1905,16 +1894,7 @@ gckOS_ReadRegisterEx(
 
     BUG_ON(!_AllowAccess(Os, Core, Address));
 
-#if gcdMULTI_GPU
-    if (Core == gcvCORE_MAJOR)
-    {
-       *Data = readl((gctUINT8 *)Os->device->registerBase3D[gcvCORE_3D_0_ID] + Address);
-    }
-    else
-#endif
-    {
-        *Data = readl((gctUINT8 *)Os->device->registerBases[Core] + Address);
-    }
+    *Data = readl((gctUINT8 *)Os->device->registerBases[Core] + Address);
 
     if (!in_interrupt())
     {
@@ -1925,31 +1905,6 @@ gckOS_ReadRegisterEx(
     gcmkFOOTER_ARG("*Data=0x%08x", *Data);
     return gcvSTATUS_OK;
 }
-
-#if gcdMULTI_GPU
-gceSTATUS
-gckOS_ReadRegisterByCoreId(
-    IN gckOS Os,
-    IN gceCORE Core,
-    IN gctUINT32 CoreId,
-    IN gctUINT32 Address,
-    OUT gctUINT32 * Data
-    )
-{
-    gcmkHEADER_ARG("Os=0x%X Core=%d CoreId=%d Address=0x%X",
-                   Os, Core, CoreId, Address);
-
-    /* Verify the arguments. */
-    gcmkVERIFY_OBJECT(Os, gcvOBJ_OS);
-    gcmkVERIFY_ARGUMENT(Data != gcvNULL);
-
-    *Data = readl((gctUINT8 *)Os->device->registerBase3D[CoreId] + Address);
-
-    /* Success. */
-    gcmkFOOTER_ARG("*Data=0x%08x", *Data);
-    return gcvSTATUS_OK;
-}
-#endif
 
 /*******************************************************************************
 **
@@ -1992,9 +1947,7 @@ gckOS_WriteRegisterEx(
 {
     gcmkHEADER_ARG("Os=0x%X Core=%d Address=0x%X Data=0x%08x", Os, Core, Address, Data);
 
-#if !gcdMULTI_GPU
     gcmkVERIFY_ARGUMENT(Address < Os->device->requestedRegisterMemSizes[Core]);
-#endif
 
     if (!in_interrupt())
     {
@@ -2003,19 +1956,7 @@ gckOS_WriteRegisterEx(
 
     BUG_ON(!_AllowAccess(Os, Core, Address));
 
-#if gcdMULTI_GPU
-    if (Core == gcvCORE_MAJOR)
-    {
-        writel(Data, (gctUINT8 *)Os->device->registerBase3D[gcvCORE_3D_0_ID] + Address);
-#if gcdMULTI_GPU > 1
-        writel(Data, (gctUINT8 *)Os->device->registerBase3D[gcvCORE_3D_1_ID] + Address);
-#endif
-    }
-    else
-#endif
-    {
-        writel(Data, (gctUINT8 *)Os->device->registerBases[Core] + Address);
-    }
+    writel(Data, (gctUINT8 *)Os->device->registerBases[Core] + Address);
 
     if (!in_interrupt())
     {
@@ -2026,27 +1967,6 @@ gckOS_WriteRegisterEx(
     gcmkFOOTER_NO();
     return gcvSTATUS_OK;
 }
-
-#if gcdMULTI_GPU
-gceSTATUS
-gckOS_WriteRegisterByCoreId(
-    IN gckOS Os,
-    IN gceCORE Core,
-    IN gctUINT32 CoreId,
-    IN gctUINT32 Address,
-    IN gctUINT32 Data
-    )
-{
-    gcmkHEADER_ARG("Os=0x%X Core=%d CoreId=%d Address=0x%X Data=0x%08x",
-                   Os, Core, CoreId, Address, Data);
-
-    writel(Data, (gctUINT8 *)Os->device->registerBase3D[CoreId] + Address);
-
-    /* Success. */
-    gcmkFOOTER_NO();
-    return gcvSTATUS_OK;
-}
-#endif
 
 /*******************************************************************************
 **
@@ -5547,32 +5467,6 @@ gckOS_SuspendInterrupt(
     return gckOS_SuspendInterruptEx(Os, gcvCORE_MAJOR);
 }
 
-#if gcdMULTI_GPU
-gceSTATUS
-gckOS_SuspendInterruptEx(
-    IN gckOS Os,
-    IN gceCORE Core
-    )
-{
-    gcmkHEADER_ARG("Os=0x%X Core=%d", Os, Core);
-
-    /* Verify the arguments. */
-    gcmkVERIFY_OBJECT(Os, gcvOBJ_OS);
-
-    if (Core == gcvCORE_MAJOR)
-    {
-        disable_irq(Os->device->irqLine3D[gcvCORE_3D_0_ID]);
-        disable_irq(Os->device->irqLine3D[gcvCORE_3D_1_ID]);
-    }
-    else
-    {
-        disable_irq(Os->device->irqLines[Core]);
-    }
-
-    gcmkFOOTER_NO();
-    return gcvSTATUS_OK;
-}
-#else
 gceSTATUS
 gckOS_SuspendInterruptEx(
     IN gckOS Os,
@@ -5589,7 +5483,6 @@ gckOS_SuspendInterruptEx(
     gcmkFOOTER_NO();
     return gcvSTATUS_OK;
 }
-#endif
 
 gceSTATUS
 gckOS_ResumeInterrupt(
@@ -5599,32 +5492,6 @@ gckOS_ResumeInterrupt(
     return gckOS_ResumeInterruptEx(Os, gcvCORE_MAJOR);
 }
 
-#if gcdMULTI_GPU
-gceSTATUS
-gckOS_ResumeInterruptEx(
-    IN gckOS Os,
-    IN gceCORE Core
-    )
-{
-    gcmkHEADER_ARG("Os=0x%X Core=%d", Os, Core);
-
-    /* Verify the arguments. */
-    gcmkVERIFY_OBJECT(Os, gcvOBJ_OS);
-
-    if (Core == gcvCORE_MAJOR)
-    {
-        enable_irq(Os->device->irqLine3D[gcvCORE_3D_0_ID]);
-        enable_irq(Os->device->irqLine3D[gcvCORE_3D_1_ID]);
-    }
-    else
-    {
-        enable_irq(Os->device->irqLines[Core]);
-    }
-
-    gcmkFOOTER_NO();
-    return gcvSTATUS_OK;
-}
-#else
 gceSTATUS
 gckOS_ResumeInterruptEx(
     IN gckOS Os,
@@ -5641,7 +5508,6 @@ gckOS_ResumeInterruptEx(
     gcmkFOOTER_NO();
     return gcvSTATUS_OK;
 }
-#endif
 
 gceSTATUS
 gckOS_MemCopy(

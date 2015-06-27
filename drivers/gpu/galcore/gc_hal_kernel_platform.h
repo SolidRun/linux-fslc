@@ -25,18 +25,9 @@
 
 typedef struct _gcsMODULE_PARAMETERS
 {
-#if gcdMULTI_GPU || gcdMULTI_GPU_AFFINITY
-    gctINT  irqLine3D0;
-    gctUINT registerMemBase3D0;
-    gctUINT registerMemSize3D0;
-    gctINT  irqLine3D1;
-    gctUINT registerMemBase3D1;
-    gctUINT registerMemSize3D1;
-#else
     gctINT  irqLine;
     gctUINT registerMemBase;
     gctUINT registerMemSize;
-#endif
     gctINT  irqLine2D;
     gctUINT registerMemBase2D;
     gctUINT registerMemSize2D;

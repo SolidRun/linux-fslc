@@ -57,40 +57,22 @@ typedef struct _gckGALDEVICE
     gctBOOL             contiguousRequested;
     gctSIZE_T           systemMemorySize;
     gctUINT32           systemMemoryBaseAddress;
-#if gcdMULTI_GPU
-    gctPOINTER          registerBase3D[gcdMULTI_GPU];
-    gctSIZE_T           registerSize3D[gcdMULTI_GPU];
-#endif
     gctPOINTER          registerBases[gcdMAX_GPU_COUNT];
     gctSIZE_T           registerSizes[gcdMAX_GPU_COUNT];
     gctUINT32           baseAddress;
     gctUINT32           physBase;
     gctUINT32           physSize;
     gctBOOL             mmu;
-#if gcdMULTI_GPU
-    gctUINT32           requestedRegisterMemBase3D[gcdMULTI_GPU];
-    gctSIZE_T           requestedRegisterMemSize3D[gcdMULTI_GPU];
-#endif
     gctUINT32           requestedRegisterMemBases[gcdMAX_GPU_COUNT];
     gctSIZE_T           requestedRegisterMemSizes[gcdMAX_GPU_COUNT];
     gctUINT32           requestedContiguousBase;
     gctSIZE_T           requestedContiguousSize;
 
     /* IRQ management. */
-#if gcdMULTI_GPU
-    gctINT              irqLine3D[gcdMULTI_GPU];
-    gctBOOL             isrInitialized3D[gcdMULTI_GPU];
-    gctBOOL             dataReady3D[gcdMULTI_GPU];
-#endif
     gctINT              irqLines[gcdMAX_GPU_COUNT];
     gctBOOL             isrInitializeds[gcdMAX_GPU_COUNT];
 
     /* Thread management. */
-#if gcdMULTI_GPU
-    struct task_struct  *threadCtxt3D[gcdMULTI_GPU];
-    wait_queue_head_t   intrWaitQueue3D[gcdMULTI_GPU];
-    gctBOOL             threadInitialized3D[gcdMULTI_GPU];
-#endif
     struct task_struct  *threadCtxts[gcdMAX_GPU_COUNT];
     struct semaphore    semas[gcdMAX_GPU_COUNT];
     gctBOOL             threadInitializeds[gcdMAX_GPU_COUNT];
@@ -175,18 +157,9 @@ gceSTATUS gckGALDEVICE_Stop(
     );
 
 gceSTATUS gckGALDEVICE_Construct(
-#if gcdMULTI_GPU || gcdMULTI_GPU_AFFINITY
-    IN gctINT IrqLine3D0,
-    IN gctUINT32 RegisterMemBase3D0,
-    IN gctSIZE_T RegisterMemSize3D0,
-    IN gctINT IrqLine3D1,
-    IN gctUINT32 RegisterMemBase3D1,
-    IN gctSIZE_T RegisterMemSize3D1,
-#else
     IN gctINT IrqLine,
     IN gctUINT32 RegisterMemBase,
     IN gctSIZE_T RegisterMemSize,
-#endif
     IN gctINT IrqLine2D,
     IN gctUINT32 RegisterMemBase2D,
     IN gctSIZE_T RegisterMemSize2D,

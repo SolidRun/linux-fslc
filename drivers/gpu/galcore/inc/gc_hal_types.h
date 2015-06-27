@@ -29,32 +29,11 @@
 #if defined(__KERNEL__)
 #include "linux/version.h"
 #include "linux/types.h"
-#elif defined(UNDER_CE)
-#include <crtdefs.h>
-#elif defined(_MSC_VER) && (_MSC_VER <= 1500)
-#include <crtdefs.h>
-#include "vadefs.h"
-#elif defined(__QNXNTO__)
-#define _QNX_SOURCE
-#include <stdint.h>
-#include <stddef.h>
 #else
 #include <stdlib.h>
 #include <stddef.h>
 #include <stdint.h>
 #endif
-#endif
-
-#ifdef _WIN32
-#pragma warning(disable:4127)   /* Conditional expression is constant (do { }
-                                ** while(0)). */
-#pragma warning(disable:4100)   /* Unreferenced formal parameter. */
-#pragma warning(disable:4204)   /* Non-constant aggregate initializer (C99). */
-#pragma warning(disable:4131)   /* Uses old-style declarator (for Bison and
-                                ** Flex generated files). */
-#pragma warning(disable:4206)   /* Translation unit is empty. */
-#pragma warning(disable:4214)   /* Nonstandard extension used :
-                                ** bit field types other than int. */
 #endif
 
 #ifdef __cplusplus
@@ -86,7 +65,7 @@ extern "C" {
 \******************************************************************************/
 #if defined(ANDROID) && defined(__BIONIC_FORTIFY)
 #   define gcmINLINE            __inline__ __attribute__ ((always_inline)) __attribute__ ((gnu_inline)) __attribute__ ((artificial))
-#elif ((defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L)) || defined(__APPLE__))
+#elif ((defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L)))
 #   define gcmINLINE            inline      /* C99 keyword. */
 #elif defined(__GNUC__)
 #   define gcmINLINE            __inline__  /* GNU keyword. */

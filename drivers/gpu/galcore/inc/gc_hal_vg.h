@@ -35,19 +35,9 @@ extern "C" {
 #if gcdENABLE_VG
 
 /* Thread routine type. */
-#if defined(LINUX)
-    typedef gctINT              gctTHREADFUNCRESULT;
-    typedef gctPOINTER          gctTHREADFUNCPARAMETER;
-#   define  gctTHREADFUNCTYPE
-#elif defined(WIN32)
-    typedef gctUINT             gctTHREADFUNCRESULT;
-    typedef gctPOINTER          gctTHREADFUNCPARAMETER;
-#   define  gctTHREADFUNCTYPE   __stdcall
-#elif defined(__QNXNTO__)
-    typedef void *              gctTHREADFUNCRESULT;
-    typedef gctPOINTER          gctTHREADFUNCPARAMETER;
-#   define  gctTHREADFUNCTYPE
-#endif
+typedef gctINT              gctTHREADFUNCRESULT;
+typedef gctPOINTER          gctTHREADFUNCPARAMETER;
+#define  gctTHREADFUNCTYPE
 
 typedef gctTHREADFUNCRESULT (gctTHREADFUNCTYPE * gctTHREADFUNC) (
     gctTHREADFUNCPARAMETER ThreadParameter
@@ -665,11 +655,6 @@ typedef struct _gcsVGCONTEXT
     /* Completion signal. */
     gctHANDLE                   process;
     gctSIGNAL                   signal;
-
-#if defined(__QNXNTO__)
-    gctINT32                    coid;
-    gctINT32                    rcvid;
-#endif
 }
 gcsVGCONTEXT;
 
@@ -709,11 +694,6 @@ typedef struct _gcsTASK_MASTER_TABLE
 
     /* The total size of event data in bytes. */
     gctUINT                     size;
-
-#if defined(__QNXNTO__)
-    gctINT32                    coid;
-    gctINT32                    rcvid;
-#endif
 }
 gcsTASK_MASTER_TABLE;
 
@@ -751,23 +731,10 @@ gckVGINTERRUPT_Disable(
     IN gctINT32 Id
     );
 
-#ifndef __QNXNTO__
-
 gceSTATUS
 gckVGINTERRUPT_Enque(
     IN gckVGINTERRUPT Interrupt
     );
-
-#else
-
-gceSTATUS
-gckVGINTERRUPT_Enque(
-    IN gckVGINTERRUPT Interrupt,
-    OUT gckOS *Os,
-    OUT gctSEMAPHORE *Semaphore
-    );
-
-#endif
 
 gceSTATUS
 gckVGINTERRUPT_DumpState(

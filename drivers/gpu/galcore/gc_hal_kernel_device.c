@@ -487,229 +487,6 @@ _FreeMemory(
 /******************************************************************************\
 ******************************* Interrupt Handler ******************************
 \******************************************************************************/
-#if gcdMULTI_GPU
-static irqreturn_t isrRoutine3D0(int irq, void *ctxt)
-{
-    gceSTATUS status;
-    gckGALDEVICE device;
-
-    device = (gckGALDEVICE) ctxt;
-
-    /* Call kernel interrupt notification. */
-    status = gckKERNEL_Notify(device->kernels[gcvCORE_MAJOR],
-                              gcvCORE_3D_0_ID,
-                              gcvNOTIFY_INTERRUPT,
-                              gcvTRUE);
-
-    if (gcmIS_SUCCESS(status))
-    {
-        /* Wake up the threadRoutine to process events. */
-        device->dataReady3D[gcvCORE_3D_0_ID] = gcvTRUE;
-        wake_up_interruptible(&device->intrWaitQueue3D[gcvCORE_3D_0_ID]);
-
-        return IRQ_HANDLED;
-    }
-
-    return IRQ_NONE;
-}
-
-static int threadRoutine3D0(void *ctxt)
-{
-    gckGALDEVICE device = (gckGALDEVICE) ctxt;
-
-    gcmkTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_DRIVER,
-                   "Starting isr Thread with extension=%p",
-                   device);
-
-    for (;;)
-    {
-        /* Sleep until being awaken by the interrupt handler. */
-        wait_event_interruptible(device->intrWaitQueue3D[gcvCORE_3D_0_ID],
-                                 device->dataReady3D[gcvCORE_3D_0_ID] == gcvTRUE);
-        device->dataReady3D[gcvCORE_3D_0_ID] = gcvFALSE;
-
-        if (device->killThread == gcvTRUE)
-        {
-            /* The daemon exits. */
-            while (!kthread_should_stop())
-            {
-                gckOS_Delay(device->os, 1);
-            }
-
-            return 0;
-        }
-
-        gckKERNEL_Notify(device->kernels[gcvCORE_MAJOR],
-                         gcvCORE_3D_0_ID,
-                         gcvNOTIFY_INTERRUPT,
-                         gcvFALSE);
-    }
-}
-
-#if gcdMULTI_GPU > 1
-static irqreturn_t isrRoutine3D1(int irq, void *ctxt)
-{
-    gceSTATUS status;
-    gckGALDEVICE device;
-
-    device = (gckGALDEVICE) ctxt;
-
-    /* Call kernel interrupt notification. */
-    status = gckKERNEL_Notify(device->kernels[gcvCORE_MAJOR],
-                              gcvCORE_3D_1_ID,
-                              gcvNOTIFY_INTERRUPT,
-                              gcvTRUE);
-
-    if (gcmIS_SUCCESS(status))
-    {
-        /* Wake up the worker thread to process events. */
-        device->dataReady3D[gcvCORE_3D_1_ID] = gcvTRUE;
-        wake_up_interruptible(&device->intrWaitQueue3D[gcvCORE_3D_1_ID]);
-
-        return IRQ_HANDLED;
-    }
-
-    return IRQ_NONE;
-}
-
-static int threadRoutine3D1(void *ctxt)
-{
-    gckGALDEVICE device = (gckGALDEVICE) ctxt;
-
-    gcmkTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_DRIVER,
-                   "Starting isr Thread with extension=%p",
-                   device);
-
-    for (;;)
-    {
-        /* Sleep until being awaken by the interrupt handler. */
-        wait_event_interruptible(device->intrWaitQueue3D[gcvCORE_3D_1_ID],
-                                 device->dataReady3D[gcvCORE_3D_1_ID] == gcvTRUE);
-        device->dataReady3D[gcvCORE_3D_1_ID] = gcvFALSE;
-
-        if (device->killThread == gcvTRUE)
-        {
-            /* The daemon exits. */
-            while (!kthread_should_stop())
-            {
-                gckOS_Delay(device->os, 1);
-            }
-
-            return 0;
-        }
-
-        gckKERNEL_Notify(device->kernels[gcvCORE_MAJOR],
-                         gcvCORE_3D_1_ID,
-                         gcvNOTIFY_INTERRUPT,
-                         gcvFALSE);
-    }
-}
-#endif
-#elif gcdMULTI_GPU_AFFINITY
-static irqreturn_t isrRoutine3D0(int irq, void *ctxt)
-{
-    gceSTATUS status;
-    gckGALDEVICE device;
-
-    device = (gckGALDEVICE) ctxt;
-
-    /* Call kernel interrupt notification. */
-    status = gckKERNEL_Notify(device->kernels[gcvCORE_MAJOR], gcvNOTIFY_INTERRUPT, gcvTRUE);
-
-    if (gcmIS_SUCCESS(status))
-    {
-        up(&device->semas[gcvCORE_MAJOR]);
-
-        return IRQ_HANDLED;
-    }
-
-    return IRQ_NONE;
-}
-
-static int threadRoutine3D0(void *ctxt)
-{
-    gckGALDEVICE device = (gckGALDEVICE) ctxt;
-
-    gcmkTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_DRIVER,
-                   "Starting isr Thread with extension=%p",
-                   device);
-
-    for (;;)
-    {
-        static int down;
-
-        down = down_interruptible(&device->semas[gcvCORE_MAJOR]);
-        if (down); /*To make gcc 4.6 happye*/
-
-        if (device->killThread == gcvTRUE)
-        {
-            /* The daemon exits. */
-            while (!kthread_should_stop())
-            {
-                gckOS_Delay(device->os, 1);
-            }
-
-            return 0;
-        }
-
-        gckKERNEL_Notify(device->kernels[gcvCORE_MAJOR],
-                         gcvNOTIFY_INTERRUPT,
-                         gcvFALSE);
-    }
-}
-
-static irqreturn_t isrRoutine3D1(int irq, void *ctxt)
-{
-    gceSTATUS status;
-    gckGALDEVICE device;
-
-    device = (gckGALDEVICE) ctxt;
-
-    /* Call kernel interrupt notification. */
-    status = gckKERNEL_Notify(device->kernels[gcvCORE_OCL], gcvNOTIFY_INTERRUPT, gcvTRUE);
-
-    if (gcmIS_SUCCESS(status))
-    {
-        up(&device->semas[gcvCORE_OCL]);
-
-        return IRQ_HANDLED;
-    }
-
-    return IRQ_NONE;
-}
-
-static int threadRoutine3D1(void *ctxt)
-{
-    gckGALDEVICE device = (gckGALDEVICE) ctxt;
-
-    gcmkTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_DRIVER,
-                   "Starting isr Thread with extension=%p",
-                   device);
-
-    for (;;)
-    {
-        static int down;
-
-        down = down_interruptible(&device->semas[gcvCORE_OCL]);
-        if (down); /*To make gcc 4.6 happye*/
-
-        if (device->killThread == gcvTRUE)
-        {
-            /* The daemon exits. */
-            while (!kthread_should_stop())
-            {
-                gckOS_Delay(device->os, 1);
-            }
-
-            return 0;
-        }
-
-        gckKERNEL_Notify(device->kernels[gcvCORE_OCL],
-                         gcvNOTIFY_INTERRUPT,
-                         gcvFALSE);
-    }
-}
-#else
 static irqreturn_t isrRoutine(int irq, void *ctxt)
 {
     gceSTATUS status;
@@ -761,7 +538,6 @@ static int threadRoutine(void *ctxt)
                          gcvFALSE);
     }
 }
-#endif
 
 static irqreturn_t isrRoutine2D(int irq, void *ctxt)
 {
@@ -772,9 +548,6 @@ static irqreturn_t isrRoutine2D(int irq, void *ctxt)
 
     /* Call kernel interrupt notification. */
     status = gckKERNEL_Notify(device->kernels[gcvCORE_2D],
-#if gcdMULTI_GPU
-                              0,
-#endif
                               gcvNOTIFY_INTERRUPT,
                               gcvTRUE);
     if (gcmIS_SUCCESS(status))
@@ -813,9 +586,6 @@ static int threadRoutine2D(void *ctxt)
             return 0;
         }
         gckKERNEL_Notify(device->kernels[gcvCORE_2D],
-#if gcdMULTI_GPU
-                         0,
-#endif
                          gcvNOTIFY_INTERRUPT,
                          gcvFALSE);
     }
@@ -867,9 +637,6 @@ static int threadRoutineVG(void *ctxt)
             return 0;
         }
         gckKERNEL_Notify(device->kernels[gcvCORE_VG],
-#if gcdMULTI_GPU
-                         0,
-#endif
                          gcvNOTIFY_INTERRUPT,
                          gcvFALSE);
     }
@@ -895,18 +662,9 @@ static int threadRoutineVG(void *ctxt)
 */
 gceSTATUS
 gckGALDEVICE_Construct(
-#if gcdMULTI_GPU || gcdMULTI_GPU_AFFINITY
-    IN gctINT IrqLine3D0,
-    IN gctUINT32 RegisterMemBase3D0,
-    IN gctSIZE_T RegisterMemSize3D0,
-    IN gctINT IrqLine3D1,
-    IN gctUINT32 RegisterMemBase3D1,
-    IN gctSIZE_T RegisterMemSize3D1,
-#else
     IN gctINT IrqLine,
     IN gctUINT32 RegisterMemBase,
     IN gctSIZE_T RegisterMemSize,
-#endif
     IN gctINT IrqLine2D,
     IN gctUINT32 RegisterMemBase2D,
     IN gctSIZE_T RegisterMemSize2D,
@@ -937,25 +695,10 @@ gckGALDEVICE_Construct(
     gckGALDEVICE device;
     gceSTATUS status;
     gctINT32 i;
-#if gcdMULTI_GPU
-    gctINT32 j;
-#endif
     gceHARDWARE_TYPE type;
     gckDB sharedDB = gcvNULL;
     gckKERNEL kernel = gcvNULL;
 
-#if gcdMULTI_GPU || gcdMULTI_GPU_AFFINITY
-    gcmkHEADER_ARG("IrqLine3D0=%d RegisterMemBase3D0=0x%08x RegisterMemSize3D0=%u "
-                   "IrqLine2D=%d RegisterMemBase2D=0x%08x RegisterMemSize2D=%u "
-                   "IrqLineVG=%d RegisterMemBaseVG=0x%08x RegisterMemSizeVG=%u "
-                   "ContiguousBase=0x%08x ContiguousSize=%lu BankSize=%lu "
-                   "FastClear=%d Compression=%d PhysBaseAddr=0x%x PhysSize=%d Signal=%d",
-                   IrqLine3D0, RegisterMemBase3D0, RegisterMemSize3D0,
-                   IrqLine2D, RegisterMemBase2D, RegisterMemSize2D,
-                   IrqLineVG, RegisterMemBaseVG, RegisterMemSizeVG,
-                   ContiguousBase, ContiguousSize, BankSize, FastClear, Compression,
-                   PhysBaseAddr, PhysSize, Signal);
-#else
     gcmkHEADER_ARG("IrqLine=%d RegisterMemBase=0x%08x RegisterMemSize=%u "
                    "IrqLine2D=%d RegisterMemBase2D=0x%08x RegisterMemSize2D=%u "
                    "IrqLineVG=%d RegisterMemBaseVG=0x%08x RegisterMemSizeVG=%u "
@@ -966,7 +709,6 @@ gckGALDEVICE_Construct(
                    IrqLineVG, RegisterMemBaseVG, RegisterMemSizeVG,
                    ContiguousBase, ContiguousSize, BankSize, FastClear, Compression,
                    PhysBaseAddr, PhysSize, Signal);
-#endif
 
 #if gcdDISABLE_CORES_2D3D
     IrqLine = -1;
@@ -1004,37 +746,11 @@ gckGALDEVICE_Construct(
         gckDEBUGFS_SetCurrentNode(device->dbgNode);
     }
 
-#if gcdMULTI_GPU
-    if (IrqLine3D0 != -1)
-    {
-        device->requestedRegisterMemBase3D[gcvCORE_3D_0_ID] = RegisterMemBase3D0;
-        device->requestedRegisterMemSize3D[gcvCORE_3D_0_ID] = RegisterMemSize3D0;
-    }
-
-    if (IrqLine3D1 != -1)
-    {
-        device->requestedRegisterMemBase3D[gcvCORE_3D_1_ID] = RegisterMemBase3D1;
-        device->requestedRegisterMemSize3D[gcvCORE_3D_1_ID] = RegisterMemSize3D1;
-    }
-#elif gcdMULTI_GPU_AFFINITY
-    if (IrqLine3D0 != -1)
-    {
-        device->requestedRegisterMemBases[gcvCORE_MAJOR] = RegisterMemBase3D0;
-        device->requestedRegisterMemSizes[gcvCORE_MAJOR] = RegisterMemSize3D0;
-    }
-
-    if (IrqLine3D1 != -1)
-    {
-        device->requestedRegisterMemBases[gcvCORE_OCL] = RegisterMemBase3D1;
-        device->requestedRegisterMemSizes[gcvCORE_OCL] = RegisterMemSize3D1;
-    }
-#else
     if (IrqLine != -1)
     {
         device->requestedRegisterMemBases[gcvCORE_MAJOR] = RegisterMemBase;
         device->requestedRegisterMemSizes[gcvCORE_MAJOR] = RegisterMemSize;
     }
-#endif
 
     if (IrqLine2D != -1)
     {
@@ -1053,96 +769,43 @@ gckGALDEVICE_Construct(
 
     for (i = 0; i < gcdMAX_GPU_COUNT; i++)
     {
-#if gcdMULTI_GPU
-        if (i == gcvCORE_MAJOR)
+        physical = device->requestedRegisterMemBases[i];
+
+        /* Set up register memory region. */
+        if (physical != 0)
         {
-            for (j = 0; j < gcdMULTI_GPU; j++)
+            mem_region = request_mem_region(physical,
+                    device->requestedRegisterMemSizes[i],
+                    "galcore register region");
+
+            if (mem_region == gcvNULL)
             {
-                physical = device->requestedRegisterMemBase3D[j];
+                gcmkTRACE_ZONE(
+                        gcvLEVEL_ERROR, gcvZONE_DRIVER,
+                        "%s(%d): Failed to claim %lu bytes @ 0x%08X\n",
+                        __FUNCTION__, __LINE__,
+                        physical, device->requestedRegisterMemSizes[i]
+                );
 
-                /* Set up register memory region. */
-                if (physical != 0)
-                {
-                    mem_region = request_mem_region(physical,
-                            device->requestedRegisterMemSize3D[j],
-                            "galcore register region");
-
-                    if (mem_region == gcvNULL)
-                    {
-                        gcmkTRACE_ZONE(
-                                gcvLEVEL_ERROR, gcvZONE_DRIVER,
-                                "%s(%d): Failed to claim %lu bytes @ 0x%08X\n",
-                                __FUNCTION__, __LINE__,
-                                physical, device->requestedRegisterMemSize3D[j]
-                        );
-
-                        gcmkONERROR(gcvSTATUS_OUT_OF_RESOURCES);
-                    }
-
-                    device->registerBase3D[j] = (gctPOINTER) ioremap_nocache(
-                            physical, device->requestedRegisterMemSize3D[j]);
-
-                    if (device->registerBase3D[j] == gcvNULL)
-                    {
-                        gcmkTRACE_ZONE(
-                                gcvLEVEL_ERROR, gcvZONE_DRIVER,
-                                "%s(%d): Unable to map %ld bytes @ 0x%08X\n",
-                                __FUNCTION__, __LINE__,
-                                physical, device->requestedRegisterMemSize3D[j]
-                        );
-
-                        gcmkONERROR(gcvSTATUS_OUT_OF_RESOURCES);
-                    }
-
-                    physical += device->requestedRegisterMemSize3D[j];
-                }
-                else
-                {
-                    device->registerBase3D[j] = gcvNULL;
-                }
+                gcmkONERROR(gcvSTATUS_OUT_OF_RESOURCES);
             }
-        }
-        else
-#endif
-        {
-            physical = device->requestedRegisterMemBases[i];
 
-            /* Set up register memory region. */
-            if (physical != 0)
+            device->registerBases[i] = (gctPOINTER) ioremap_nocache(
+                    physical, device->requestedRegisterMemSizes[i]);
+
+            if (device->registerBases[i] == gcvNULL)
             {
-                mem_region = request_mem_region(physical,
-                        device->requestedRegisterMemSizes[i],
-                        "galcore register region");
+                gcmkTRACE_ZONE(
+                        gcvLEVEL_ERROR, gcvZONE_DRIVER,
+                        "%s(%d): Unable to map %ld bytes @ 0x%08X\n",
+                        __FUNCTION__, __LINE__,
+                        physical, device->requestedRegisterMemSizes[i]
+                );
 
-                if (mem_region == gcvNULL)
-                {
-                    gcmkTRACE_ZONE(
-                            gcvLEVEL_ERROR, gcvZONE_DRIVER,
-                            "%s(%d): Failed to claim %lu bytes @ 0x%08X\n",
-                            __FUNCTION__, __LINE__,
-                            physical, device->requestedRegisterMemSizes[i]
-                    );
-
-                    gcmkONERROR(gcvSTATUS_OUT_OF_RESOURCES);
-                }
-
-                device->registerBases[i] = (gctPOINTER) ioremap_nocache(
-                        physical, device->requestedRegisterMemSizes[i]);
-
-                if (device->registerBases[i] == gcvNULL)
-                {
-                    gcmkTRACE_ZONE(
-                            gcvLEVEL_ERROR, gcvZONE_DRIVER,
-                            "%s(%d): Unable to map %ld bytes @ 0x%08X\n",
-                            __FUNCTION__, __LINE__,
-                            physical, device->requestedRegisterMemSizes[i]
-                    );
-
-                    gcmkONERROR(gcvSTATUS_OUT_OF_RESOURCES);
-                }
-
-                physical += device->requestedRegisterMemSizes[i];
+                gcmkONERROR(gcvSTATUS_OUT_OF_RESOURCES);
             }
+
+            physical += device->requestedRegisterMemSizes[i];
         }
     }
 
@@ -1154,11 +817,7 @@ gckGALDEVICE_Construct(
     /* Construct the gckOS object. */
     gcmkONERROR(gckOS_Construct(device, &device->os));
 
-#if gcdMULTI_GPU || gcdMULTI_GPU_AFFINITY
-    if (IrqLine3D0 != -1)
-#else
     if (IrqLine != -1)
-#endif
     {
         /* Construct the gckKERNEL object. */
         gcmkONERROR(gckKERNEL_Construct(
@@ -1231,79 +890,6 @@ gckGALDEVICE_Construct(
         device->kernels[gcvCORE_MAJOR] = gcvNULL;
     }
 
-#if gcdMULTI_GPU_AFFINITY
-    if (IrqLine3D1 != -1)
-    {
-        /* Construct the gckKERNEL object. */
-        gcmkONERROR(gckKERNEL_Construct(
-            device->os, gcvCORE_OCL, device,
-            gcvNULL, &device->kernels[gcvCORE_OCL]));
-
-        if (sharedDB == gcvNULL) sharedDB = device->kernels[gcvCORE_OCL]->db;
-
-        /* Initialize core mapping */
-        if (device->kernels[gcvCORE_MAJOR] == gcvNULL)
-        {
-            for (i = 0; i < 8; i++)
-            {
-                device->coreMapping[i] = gcvCORE_OCL;
-            }
-        }
-        else
-        {
-            device->coreMapping[gcvHARDWARE_OCL] = gcvCORE_OCL;
-        }
-
-        /* Setup the ISR manager. */
-        gcmkONERROR(gckHARDWARE_SetIsrManager(
-            device->kernels[gcvCORE_OCL]->hardware,
-            (gctISRMANAGERFUNC) gckGALDEVICE_Setup_ISR,
-            (gctISRMANAGERFUNC) gckGALDEVICE_Release_ISR,
-            device
-            ));
-
-        gcmkONERROR(gckHARDWARE_SetFastClear(
-            device->kernels[gcvCORE_OCL]->hardware, FastClear, Compression
-            ));
-
-#if gcdENABLE_FSCALE_VAL_ADJUST
-        gcmkONERROR(gckHARDWARE_SetMinFscaleValue(
-            device->kernels[gcvCORE_OCL]->hardware, Args->gpu3DMinClock
-            ));
-#endif
-        if(PowerManagement != -1)
-        {
-            gcmkONERROR(gckHARDWARE_SetPowerManagementLock(
-                device->kernels[gcvCORE_OCL]->hardware, gcvFALSE
-                ));
-            gcmkONERROR(gckHARDWARE_SetPowerManagement(
-                device->kernels[gcvCORE_OCL]->hardware, PowerManagement
-                ));
-            gcmkONERROR(gckHARDWARE_SetPowerManagementLock(
-                device->kernels[gcvCORE_OCL]->hardware, gcvTRUE
-                ));
-        }
-        else
-        {
-            gcmkONERROR(gckHARDWARE_SetPowerManagementLock(
-                device->kernels[gcvCORE_OCL]->hardware, gcvFALSE
-                ));
-            gcmkONERROR(gckHARDWARE_SetPowerManagement(
-                device->kernels[gcvCORE_OCL]->hardware, gcvTRUE
-                ));
-        }
-
-#if COMMAND_PROCESSOR_VERSION == 1
-        /* Start the command queue. */
-        gcmkONERROR(gckCOMMAND_Start(device->kernels[gcvCORE_OCL]->command));
-#endif
-    }
-    else
-    {
-        device->kernels[gcvCORE_OCL] = gcvNULL;
-    }
-#endif
-
     if (IrqLine2D != -1)
     {
         gcmkONERROR(gckKERNEL_Construct(
@@ -1328,11 +914,7 @@ gckGALDEVICE_Construct(
         }
 
         /* Initialize core mapping */
-        if (device->kernels[gcvCORE_MAJOR] == gcvNULL
-#if gcdMULTI_GPU_AFFINITY
-            && device->kernels[gcvCORE_OCL] == gcvNULL
-#endif
-            )
+        if (device->kernels[gcvCORE_MAJOR] == gcvNULL)
         {
             for (i = 0; i < 8; i++)
             {
@@ -1403,9 +985,6 @@ gckGALDEVICE_Construct(
         /* Initialize core mapping */
         if (device->kernels[gcvCORE_MAJOR] == gcvNULL
             && device->kernels[gcvCORE_2D] == gcvNULL
-#if gcdMULTI_GPU_AFFINITY
-            && device->kernels[gcvCORE_OCL] == gcvNULL
-#endif
             )
         {
             for (i = 0; i < 8; i++)
@@ -1442,36 +1021,14 @@ gckGALDEVICE_Construct(
     }
 
     /* Initialize the ISR. */
-#if gcdMULTI_GPU
-    device->irqLine3D[gcvCORE_3D_0_ID] = IrqLine3D0;
-#if gcdMULTI_GPU > 1
-    device->irqLine3D[gcvCORE_3D_1_ID] = IrqLine3D1;
-#endif
-#elif gcdMULTI_GPU_AFFINITY
-    device->irqLines[gcvCORE_MAJOR] = IrqLine3D0;
-    device->irqLines[gcvCORE_OCL]   = IrqLine3D1;
-#else
     device->irqLines[gcvCORE_MAJOR] = IrqLine;
-#endif
     device->irqLines[gcvCORE_2D] = IrqLine2D;
     device->irqLines[gcvCORE_VG] = IrqLineVG;
 
     /* Initialize the kernel thread semaphores. */
     for (i = 0; i < gcdMAX_GPU_COUNT; i++)
     {
-#if gcdMULTI_GPU
-        if (i == gcvCORE_MAJOR)
-        {
-            for (j = 0; j < gcdMULTI_GPU; j++)
-            {
-                if (device->irqLine3D[j] != -1) init_waitqueue_head(&device->intrWaitQueue3D[j]);
-            }
-        }
-        else
-#endif
-        {
-            if (device->irqLines[i] != -1) sema_init(&device->semas[i], 0);
-        }
+        if (device->irqLines[i] != -1) sema_init(&device->semas[i], 0);
     }
 
     device->signal = Signal;
@@ -1526,26 +1083,10 @@ gckGALDEVICE_Construct(
     /* Grab the first availiable kernel */
     for (i = 0; i < gcdMAX_GPU_COUNT; i++)
     {
-#if gcdMULTI_GPU
-        if (i == gcvCORE_MAJOR)
+        if (device->irqLines[i] != -1)
         {
-            for (j = 0; j < gcdMULTI_GPU; j++)
-            {
-                if (device->irqLine3D[j] != -1)
-                {
-                    kernel = device->kernels[i];
-                    break;
-                }
-            }
-        }
-        else
-#endif
-        {
-            if (device->irqLines[i] != -1)
-            {
-                kernel = device->kernels[i];
-                break;
-            }
+            kernel = device->kernels[i];
+            break;
         }
     }
 
@@ -1754,9 +1295,6 @@ gckGALDEVICE_Destroy(
     gckGALDEVICE Device)
 {
     gctINT i;
-#if gcdMULTI_GPU
-    gctINT j;
-#endif
     gckKERNEL kernel = gcvNULL;
 
     gcmkHEADER_ARG("Device=0x%x", Device);
@@ -1766,26 +1304,10 @@ gckGALDEVICE_Destroy(
         /* Grab the first availiable kernel */
         for (i = 0; i < gcdMAX_GPU_COUNT; i++)
         {
-#if gcdMULTI_GPU
-            if (i == gcvCORE_MAJOR)
+            if (Device->irqLines[i] != -1)
             {
-                for (j = 0; j < gcdMULTI_GPU; j++)
-                {
-                    if (Device->irqLine3D[j] != -1)
-                    {
-                        kernel = Device->kernels[i];
-                        break;
-                    }
-                }
-            }
-            else
-#endif
-            {
-                if (Device->irqLines[i] != -1)
-                {
-                    kernel = Device->kernels[i];
-                    break;
-                }
+                kernel = Device->kernels[i];
+                break;
             }
         }
 
@@ -1888,44 +1410,19 @@ gckGALDEVICE_Destroy(
 
         for (i = 0; i < gcdMAX_GPU_COUNT; i++)
         {
-#if gcdMULTI_GPU
-            if (i == gcvCORE_MAJOR)
+            if (Device->registerBases[i] != gcvNULL)
             {
-                for (j = 0; j < gcdMULTI_GPU; j++)
+                /* Unmap register memory. */
+                iounmap(Device->registerBases[i]);
+                if (Device->requestedRegisterMemBases[i] != 0)
                 {
-                    if (Device->registerBase3D[j] != gcvNULL)
-                    {
-                        /* Unmap register memory. */
-                        iounmap(Device->registerBase3D[j]);
-                        if (Device->requestedRegisterMemBase3D[j] != 0)
-                        {
-                            release_mem_region(Device->requestedRegisterMemBase3D[j],
-                                    Device->requestedRegisterMemSize3D[j]);
-                        }
-
-                        Device->registerBase3D[j] = gcvNULL;
-                        Device->requestedRegisterMemBase3D[j] = 0;
-                        Device->requestedRegisterMemSize3D[j] = 0;
-                    }
+                    release_mem_region(Device->requestedRegisterMemBases[i],
+                            Device->requestedRegisterMemSizes[i]);
                 }
-            }
-            else
-#endif
-            {
-                if (Device->registerBases[i] != gcvNULL)
-                {
-                    /* Unmap register memory. */
-                    iounmap(Device->registerBases[i]);
-                    if (Device->requestedRegisterMemBases[i] != 0)
-                    {
-                        release_mem_region(Device->requestedRegisterMemBases[i],
-                                Device->requestedRegisterMemSizes[i]);
-                    }
 
-                    Device->registerBases[i] = gcvNULL;
-                    Device->requestedRegisterMemBases[i] = 0;
-                    Device->requestedRegisterMemSizes[i] = 0;
-                }
+                Device->registerBases[i] = gcvNULL;
+                Device->requestedRegisterMemBases[i] = 0;
+                Device->requestedRegisterMemSizes[i] = 0;
             }
         }
 
@@ -1986,89 +1483,6 @@ gckGALDEVICE_Setup_ISR(
     }
 
     /* Hook up the isr based on the irq line. */
-#if gcdMULTI_GPU
-    ret = request_irq(
-        Device->irqLine3D[gcvCORE_3D_0_ID], isrRoutine3D0, 0,
-        "galcore_3d_0", Device
-        );
-
-    if (ret != 0)
-    {
-        gcmkTRACE_ZONE(
-            gcvLEVEL_ERROR, gcvZONE_DRIVER,
-            "%s(%d): Could not register irq line %d (error=%d)\n",
-            __FUNCTION__, __LINE__,
-            Device->irqLine3D[gcvCORE_3D_0_ID], ret
-            );
-
-        gcmkONERROR(gcvSTATUS_GENERIC_IO);
-    }
-
-    /* Mark ISR as initialized. */
-    Device->isrInitialized3D[gcvCORE_3D_0_ID] = gcvTRUE;
-
-#if gcdMULTI_GPU > 1
-    ret = request_irq(
-        Device->irqLine3D[gcvCORE_3D_1_ID], isrRoutine3D1, 0,
-        "galcore_3d_1", Device
-        );
-
-    if (ret != 0)
-    {
-        gcmkTRACE_ZONE(
-            gcvLEVEL_ERROR, gcvZONE_DRIVER,
-            "%s(%d): Could not register irq line %d (error=%d)\n",
-            __FUNCTION__, __LINE__,
-            Device->irqLine3D[gcvCORE_3D_1_ID], ret
-            );
-
-        gcmkONERROR(gcvSTATUS_GENERIC_IO);
-    }
-
-    /* Mark ISR as initialized. */
-    Device->isrInitialized3D[gcvCORE_3D_1_ID] = gcvTRUE;
-#endif
-#elif gcdMULTI_GPU_AFFINITY
-    ret = request_irq(
-        Device->irqLines[gcvCORE_MAJOR], isrRoutine3D0, 0,
-        "galcore_3d_0", Device
-        );
-
-    if (ret != 0)
-    {
-        gcmkTRACE_ZONE(
-            gcvLEVEL_ERROR, gcvZONE_DRIVER,
-            "%s(%d): Could not register irq line %d (error=%d)\n",
-            __FUNCTION__, __LINE__,
-            Device->irqLines[gcvCORE_MAJOR], ret
-            );
-
-        gcmkONERROR(gcvSTATUS_GENERIC_IO);
-    }
-
-    /* Mark ISR as initialized. */
-    Device->isrInitializeds[gcvCORE_MAJOR] = gcvTRUE;
-
-    ret = request_irq(
-        Device->irqLines[gcvCORE_OCL], isrRoutine3D1, 0,
-        "galcore_3d_1", Device
-        );
-
-    if (ret != 0)
-    {
-        gcmkTRACE_ZONE(
-            gcvLEVEL_ERROR, gcvZONE_DRIVER,
-            "%s(%d): Could not register irq line %d (error=%d)\n",
-            __FUNCTION__, __LINE__,
-            Device->irqLines[gcvCORE_OCL], ret
-            );
-
-        gcmkONERROR(gcvSTATUS_GENERIC_IO);
-    }
-
-    /* Mark ISR as initialized. */
-    Device->isrInitializeds[gcvCORE_OCL] = gcvTRUE;
-#else
     ret = request_irq(
         Device->irqLines[gcvCORE_MAJOR], isrRoutine, 0,
         "galcore interrupt service", Device
@@ -2088,7 +1502,6 @@ gckGALDEVICE_Setup_ISR(
 
     /* Mark ISR as initialized. */
     Device->isrInitializeds[gcvCORE_MAJOR] = gcvTRUE;
-#endif
 
     gcmkFOOTER_NO();
     return gcvSTATUS_OK;
@@ -2218,29 +1631,12 @@ gckGALDEVICE_Release_ISR(
 
     gcmkVERIFY_ARGUMENT(Device != NULL);
 
-#if gcdMULTI_GPU
-    /* release the irq */
-    if (Device->isrInitialized3D[gcvCORE_3D_0_ID])
-    {
-        free_irq(Device->irqLine3D[gcvCORE_3D_0_ID], Device);
-        Device->isrInitialized3D[gcvCORE_3D_0_ID] = gcvFALSE;
-    }
-#if gcdMULTI_GPU > 1
-    /* release the irq */
-    if (Device->isrInitialized3D[gcvCORE_3D_1_ID])
-    {
-        free_irq(Device->irqLine3D[gcvCORE_3D_1_ID], Device);
-        Device->isrInitialized3D[gcvCORE_3D_1_ID] = gcvFALSE;
-    }
-#endif
-#else
     /* release the irq */
     if (Device->isrInitializeds[gcvCORE_MAJOR])
     {
         free_irq(Device->irqLines[gcvCORE_MAJOR], Device);
         Device->isrInitializeds[gcvCORE_MAJOR] = gcvFALSE;
     }
-#endif
 
     gcmkFOOTER_NO();
     return gcvSTATUS_OK;
@@ -2321,86 +1717,6 @@ gckGALDEVICE_Start_Threads(
 
     gcmkVERIFY_ARGUMENT(Device != NULL);
 
-#if gcdMULTI_GPU
-    if (Device->kernels[gcvCORE_MAJOR] != gcvNULL)
-    {
-        /* Start the kernel thread. */
-        task = kthread_run(threadRoutine3D0, Device, "galcore_3d_0");
-
-        if (IS_ERR(task))
-        {
-            gcmkTRACE_ZONE(
-                gcvLEVEL_ERROR, gcvZONE_DRIVER,
-                "%s(%d): Could not start the kernel thread.\n",
-                __FUNCTION__, __LINE__
-                );
-
-            gcmkONERROR(gcvSTATUS_GENERIC_IO);
-        }
-
-        Device->threadCtxt3D[gcvCORE_3D_0_ID]          = task;
-        Device->threadInitialized3D[gcvCORE_3D_0_ID]   = gcvTRUE;
-
-#if gcdMULTI_GPU > 1
-        /* Start the kernel thread. */
-        task = kthread_run(threadRoutine3D1, Device, "galcore_3d_1");
-
-        if (IS_ERR(task))
-        {
-            gcmkTRACE_ZONE(
-                gcvLEVEL_ERROR, gcvZONE_DRIVER,
-                "%s(%d): Could not start the kernel thread.\n",
-                __FUNCTION__, __LINE__
-                );
-
-            gcmkONERROR(gcvSTATUS_GENERIC_IO);
-        }
-
-        Device->threadCtxt3D[gcvCORE_3D_1_ID]          = task;
-        Device->threadInitialized3D[gcvCORE_3D_1_ID]   = gcvTRUE;
-#endif
-    }
-#elif gcdMULTI_GPU_AFFINITY
-    if (Device->kernels[gcvCORE_MAJOR] != gcvNULL)
-    {
-        /* Start the kernel thread. */
-        task = kthread_run(threadRoutine3D0, Device, "galcore_3d_0");
-
-        if (IS_ERR(task))
-        {
-            gcmkTRACE_ZONE(
-                gcvLEVEL_ERROR, gcvZONE_DRIVER,
-                "%s(%d): Could not start the kernel thread.\n",
-                __FUNCTION__, __LINE__
-                );
-
-            gcmkONERROR(gcvSTATUS_GENERIC_IO);
-        }
-
-        Device->threadCtxts[gcvCORE_MAJOR]          = task;
-        Device->threadInitializeds[gcvCORE_MAJOR]   = gcvTRUE;
-    }
-
-    if (Device->kernels[gcvCORE_OCL] != gcvNULL)
-    {
-        /* Start the kernel thread. */
-        task = kthread_run(threadRoutine3D1, Device, "galcore_3d_1");
-
-        if (IS_ERR(task))
-        {
-            gcmkTRACE_ZONE(
-                gcvLEVEL_ERROR, gcvZONE_DRIVER,
-                "%s(%d): Could not start the kernel thread.\n",
-                __FUNCTION__, __LINE__
-                );
-
-            gcmkONERROR(gcvSTATUS_GENERIC_IO);
-        }
-
-        Device->threadCtxts[gcvCORE_OCL]          = task;
-        Device->threadInitializeds[gcvCORE_OCL]   = gcvTRUE;
-    }
-#else
     if (Device->kernels[gcvCORE_MAJOR] != gcvNULL)
     {
         /* Start the kernel thread. */
@@ -2420,7 +1736,6 @@ gckGALDEVICE_Start_Threads(
         Device->threadCtxts[gcvCORE_MAJOR]          = task;
         Device->threadInitializeds[gcvCORE_MAJOR]   = gcvTRUE;
     }
-#endif
 
     if (Device->kernels[gcvCORE_2D] != gcvNULL)
     {
@@ -2504,9 +1819,6 @@ gckGALDEVICE_Stop_Threads(
     )
 {
     gctINT i;
-#if gcdMULTI_GPU
-    gctINT j;
-#endif
 
     gcmkHEADER_ARG("Device=0x%x", Device);
 
@@ -2514,37 +1826,15 @@ gckGALDEVICE_Stop_Threads(
 
     for (i = 0; i < gcdMAX_GPU_COUNT; i++)
     {
-#if gcdMULTI_GPU
-        if (i == gcvCORE_MAJOR)
+        /* Stop the kernel threads. */
+        if (Device->threadInitializeds[i])
         {
-            for (j = 0; j < gcdMULTI_GPU; j++)
-            {
-                /* Stop the kernel threads. */
-                if (Device->threadInitialized3D[j])
-                {
-                    Device->killThread = gcvTRUE;
-                    Device->dataReady3D[j] = gcvTRUE;
-                    wake_up_interruptible(&Device->intrWaitQueue3D[j]);
+            Device->killThread = gcvTRUE;
+            up(&Device->semas[i]);
 
-                    kthread_stop(Device->threadCtxt3D[j]);
-                    Device->threadCtxt3D[j]        = gcvNULL;
-                    Device->threadInitialized3D[j] = gcvFALSE;
-                }
-            }
-        }
-        else
-#endif
-        {
-            /* Stop the kernel threads. */
-            if (Device->threadInitializeds[i])
-            {
-                Device->killThread = gcvTRUE;
-                up(&Device->semas[i]);
-
-                kthread_stop(Device->threadCtxts[i]);
-                Device->threadCtxts[i]        = gcvNULL;
-                Device->threadInitializeds[i] = gcvFALSE;
-            }
+            kthread_stop(Device->threadCtxts[i]);
+            Device->threadCtxts[i]        = gcvNULL;
+            Device->threadInitializeds[i] = gcvFALSE;
         }
     }
 

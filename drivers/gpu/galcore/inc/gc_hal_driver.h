@@ -274,11 +274,6 @@ typedef struct _gcsHAL_QUERY_CHIP_IDENTITY
     /* Supertile layout style in hardware */
     gctUINT32                   superTileMode;
 
-#if gcdMULTI_GPU
-    /* Number of 3D GPUs */
-    gctUINT32                   gpuCoreCount;
-#endif
-
     /* Special control bits for 2D chip. */
     gctUINT32                   chip2DControl;
 
@@ -305,14 +300,6 @@ typedef struct _gcsHAL_COMPOSE
     gctUINT64                   userProcess;
     gctUINT64                   userSignal1;
     gctUINT64                   userSignal2;
-
-#if defined(__QNXNTO__)
-    /* Client pulse side-channel connection ID. */
-    gctINT32                    coid;
-
-    /* Set by server. */
-    gctINT32                    rcvid;
-#endif
 }
 gcsHAL_COMPOSE;
 
@@ -453,15 +440,6 @@ typedef struct _gcsHAL_INTERFACE
         {
             /* Allocated video memory. */
             IN gctUINT32                node;
-
-#ifdef __QNXNTO__
-/* TODO: This is part of the unlock - why is it here? */
-            /* Mapped logical address to unmap in user space. */
-            OUT gctUINT64               memory;
-
-            /* Number of bytes to allocated. */
-            OUT gctUINT64               bytes;
-#endif
         }
         ReleaseVideoMemory;
 
@@ -565,12 +543,6 @@ typedef struct _gcsHAL_INTERFACE
         {
             /* Event queue in gcsQUEUE. */
             IN gctUINT64            queue;
-
-#if gcdMULTI_GPU
-            IN gceCORE_3D_MASK     chipEnable;
-
-            IN gceMULTI_GPU_MODE    gpuMode;
-#endif
         }
         Event;
 
@@ -588,12 +560,6 @@ typedef struct _gcsHAL_INTERFACE
 
             /* Event queue in gcsQUEUE. */
             IN gctUINT64            queue;
-
-#if gcdMULTI_GPU
-            IN gceCORE_3D_MASK      chipEnable;
-
-            IN gceMULTI_GPU_MODE    gpuMode;
-#endif
         }
         Commit;
 
@@ -667,14 +633,6 @@ typedef struct _gcsHAL_INTERFACE
 
             /* Process owning the signal gctHANDLE. */
             IN gctUINT64                process;
-
-#if defined(__QNXNTO__)
-            /* Client pulse side-channel connection ID. Set by client in gcoOS_CreateSignal. */
-            IN gctINT32                 coid;
-
-            /* Set by server. */
-            IN gctINT32                 rcvid;
-#endif
             /* Event generated from where of pipeline */
             IN gceKERNEL_WHERE          fromWhere;
         }
@@ -743,34 +701,6 @@ typedef struct _gcsHAL_INTERFACE
             IN gctUINT32            data;
         }
         WriteRegisterData;
-
-#if gcdMULTI_GPU
-        /* gcvHAL_READ_REGISTER_EX */
-        struct _gcsHAL_READ_REGISTER_EX
-        {
-            /* Logical address of memory to write data to. */
-            IN gctUINT32            address;
-
-            IN gctUINT32            coreSelect;
-
-            /* Data read. */
-            OUT gctUINT32           data[gcdMULTI_GPU];
-        }
-        ReadRegisterDataEx;
-
-        /* gcvHAL_WRITE_REGISTER_EX */
-        struct _gcsHAL_WRITE_REGISTER_EX
-        {
-            /* Logical address of memory to write data to. */
-            IN gctUINT32            address;
-
-            IN gctUINT32            coreSelect;
-
-            /* Data read. */
-            IN gctUINT32            data[gcdMULTI_GPU];
-        }
-        WriteRegisterDataEx;
-#endif
 
 #if VIVANTE_PROFILER
         /* gcvHAL_GET_PROFILE_SETTING */
