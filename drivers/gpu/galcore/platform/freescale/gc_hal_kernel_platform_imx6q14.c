@@ -286,7 +286,7 @@ static DRIVER_ATTR(gpu3DMinClock, S_IRUGO | S_IWUSR, show_gpu3DMinClock, update_
 
 static const struct of_device_id mxs_gpu_dt_ids[] = {
     { .compatible = "fsl,imx6q-gpu", },
-    { .compatible = "vivante,gc", },
+    { .compatible = "fsl,imx-gpu-subsystem", },
     {/* sentinel */}
 };
 MODULE_DEVICE_TABLE(of, mxs_gpu_dt_ids);
@@ -612,7 +612,6 @@ _SetClock(
     return gcvSTATUS_OK;
 }
 
-#if 0
 #ifdef CONFIG_PM
 static int gpu_runtime_suspend(struct device *dev)
 {
@@ -632,7 +631,6 @@ static int gpu_runtime_resume(struct device *dev)
 
 static struct dev_pm_ops gpu_pm_ops;
 #endif
-#endif
 
 gceSTATUS
 _AdjustDriver(
@@ -641,6 +639,19 @@ _AdjustDriver(
 {
     struct platform_driver * driver = Platform->driver;
     driver->driver.of_match_table = mxs_gpu_dt_ids;
+
+    /* Fill local structure with original value. */
+    memcpy(&gpu_pm_ops, driver->driver.pm, sizeof(struct dev_pm_ops));
+
+    /* Add runtime PM callback. */
+#ifdef CONFIG_PM
+    gpu_pm_ops.runtime_suspend = gpu_runtime_suspend;
+    gpu_pm_ops.runtime_resume = gpu_runtime_resume;
+    gpu_pm_ops.runtime_idle = NULL;
+
+    /* Replace callbacks. */
+    driver->driver.pm = &gpu_pm_ops;
+#endif
 
     return gcvSTATUS_OK;
 }
