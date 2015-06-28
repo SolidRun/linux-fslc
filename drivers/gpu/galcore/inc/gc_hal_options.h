@@ -31,15 +31,6 @@
 #endif
 
 /*
-    USE_NEW_LINUX_SIGNAL
-
-        This define enables the Linux kernel signaling between kernel and user.
-*/
-#ifndef USE_NEW_LINUX_SIGNAL
-#   define USE_NEW_LINUX_SIGNAL                 0
-#endif
-
-/*
     VIVANTE_PROFILER
 
         This define enables the profiler.

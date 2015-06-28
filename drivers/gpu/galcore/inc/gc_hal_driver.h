@@ -600,7 +600,6 @@ typedef struct _gcsHAL_INTERFACE
             IN gctUINT32                address;
         }
         UnmapUserMemory;
-#if !USE_NEW_LINUX_SIGNAL
         /* gcsHAL_USER_SIGNAL  */
         struct _gcsHAL_USER_SIGNAL
         {
@@ -620,7 +619,6 @@ typedef struct _gcsHAL_INTERFACE
             IN gctBOOL                  state;
         }
         UserSignal;
-#endif
 
         /* gcvHAL_SIGNAL. */
         struct _gcsHAL_SIGNAL

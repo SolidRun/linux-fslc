@@ -1437,9 +1437,7 @@ gckKERNEL_Dispatch(
     gctUINT32 address;
     gctUINT32 processID;
     gctUINT32 paddr = gcvINVALID_ADDRESS;
-#if !USE_NEW_LINUX_SIGNAL
     gctSIGNAL   signal;
-#endif
     gckVIRTUAL_COMMAND_BUFFER_PTR buffer;
 
     gckVIDMEM_NODE nodeObject;
@@ -1746,7 +1744,6 @@ gckKERNEL_Dispatch(
         gcmRELEASE_NAME(Interface->u.UnmapUserMemory.info);
         break;
 
-#if !USE_NEW_LINUX_SIGNAL
     case gcvHAL_USER_SIGNAL:
         /* Dispatch depends on the user signal subcommands. */
         switch(Interface->u.UserSignal.command)
@@ -1826,7 +1823,6 @@ gckKERNEL_Dispatch(
             gcmkONERROR(gcvSTATUS_INVALID_ARGUMENT);
         }
         break;
-#endif
 
     case gcvHAL_SET_POWER_MANAGEMENT_STATE:
         /* Set the power management state. */

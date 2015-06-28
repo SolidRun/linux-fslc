@@ -594,7 +594,6 @@ gceSTATUS gckVGKERNEL_Dispatch(
         break;
 
     case gcvHAL_USER_SIGNAL:
-#if !USE_NEW_LINUX_SIGNAL
         /* Dispatch depends on the user signal subcommands. */
         switch(Interface->u.UserSignal.command)
         {
@@ -645,7 +644,6 @@ gceSTATUS gckVGKERNEL_Dispatch(
             /* Invalid user signal command. */
             gcmkERR_BREAK(gcvSTATUS_INVALID_ARGUMENT);
         }
-#endif
         break;
 
     case gcvHAL_COMMIT:

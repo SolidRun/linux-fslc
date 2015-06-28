@@ -1182,7 +1182,6 @@ gckOS_CreateNativeFence(
     OUT gctINT * FenceFD
     );
 
-#if !USE_NEW_LINUX_SIGNAL
 /* Create signal to be used in the user space. */
 gceSTATUS
 gckOS_CreateUserSignal(
@@ -1213,7 +1212,6 @@ gckOS_SignalUserSignal(
     IN gctINT SignalID,
     IN gctBOOL State
     );
-#endif /* USE_NEW_LINUX_SIGNAL */
 
 /* Set a signal owned by a process. */
 gceSTATUS

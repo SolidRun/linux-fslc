@@ -1298,13 +1298,9 @@ gckKERNEL_DestroyProcessDB(
             break;
 
         case gcvDB_SIGNAL:
-#if USE_NEW_LINUX_SIGNAL
-            status = gcvSTATUS_NOT_SUPPORTED;
-#else
             /* Free the user signal. */
             status = gckOS_DestroyUserSignal(Kernel->os,
                                              gcmPTR2INT32(record->data));
-#endif /* USE_NEW_LINUX_SIGNAL */
 
             gcmkTRACE_ZONE(gcvLEVEL_WARNING, gcvZONE_DATABASE,
                            "DB: SIGNAL %d (status=%d)",
