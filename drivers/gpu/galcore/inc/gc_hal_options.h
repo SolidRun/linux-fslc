@@ -115,13 +115,6 @@
 #endif
 
 /*
-    COMMAND_PROCESSOR_VERSION
-
-        The version of the command buffer and task manager.
-*/
-#define COMMAND_PROCESSOR_VERSION               1
-
-/*
     gcdDUMP_KEY
 
         Set this to a string that appears in 'cat /proc/<pid>/cmdline'. E.g. 'camera'.

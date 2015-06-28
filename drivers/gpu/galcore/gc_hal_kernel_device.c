@@ -880,10 +880,8 @@ gckGALDEVICE_Construct(
             device->kernels[gcvCORE_MAJOR], Args->recovery, Args->stuckDump
             ));
 
-#if COMMAND_PROCESSOR_VERSION == 1
         /* Start the command queue. */
         gcmkONERROR(gckCOMMAND_Start(device->kernels[gcvCORE_MAJOR]->command));
-#endif
     }
     else
     {
@@ -966,10 +964,8 @@ gckGALDEVICE_Construct(
             device->kernels[gcvCORE_2D], Args->recovery, Args->stuckDump
             ));
 
-#if COMMAND_PROCESSOR_VERSION == 1
         /* Start the command queue. */
         gcmkONERROR(gckCOMMAND_Start(device->kernels[gcvCORE_2D]->command));
-#endif
     }
     else
     {
@@ -1011,8 +1007,6 @@ gckGALDEVICE_Construct(
                 gcvTRUE
                 ));
         }
-
-
 #endif
     }
     else
