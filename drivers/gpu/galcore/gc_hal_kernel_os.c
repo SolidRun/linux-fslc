@@ -4598,9 +4598,6 @@ gckOS_MapUserMemory(
     )
 {
     gceSTATUS status;
-
-    gcmkHEADER_ARG("Os=0x%x Core=%d Memory=0x%x Size=%lu", Os, Core, Memory, Size);
-
     gctSIZE_T pageCount, i, j;
     gctUINT32_PTR pageTable;
     gctUINT32 address = 0, physical = ~0U;
@@ -4613,6 +4610,8 @@ gckOS_MapUserMemory(
 
     gcsPageInfo_PTR info = gcvNULL;
     struct page **pages = gcvNULL;
+
+    gcmkHEADER_ARG("Os=0x%x Core=%d Memory=0x%x Size=%lu", Os, Core, Memory, Size);
 
     /* Verify the arguments. */
     gcmkVERIFY_OBJECT(Os, gcvOBJ_OS);
@@ -5088,14 +5087,13 @@ gckOS_UnmapUserMemory(
     )
 {
     gceSTATUS status;
-
-    gcmkHEADER_ARG("Os=0x%X Core=%d Memory=0x%X Size=%lu Info=0x%X Address0x%08x",
-                   Os, Core, Memory, Size, Info, Address);
-
     gctUINTPTR_T memory, start, end;
     gcsPageInfo_PTR info;
     gctSIZE_T pageCount, i;
     struct page **pages;
+
+    gcmkHEADER_ARG("Os=0x%X Core=%d Memory=0x%X Size=%lu Info=0x%X Address0x%08x",
+                   Os, Core, Memory, Size, Info, Address);
 
     /* Verify the arguments. */
     gcmkVERIFY_OBJECT(Os, gcvOBJ_OS);
