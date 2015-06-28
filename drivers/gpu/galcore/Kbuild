@@ -72,7 +72,6 @@ OBJS += gc_hal_kernel.o \
         gc_hal_kernel_db.o \
         gc_hal_kernel_debug.o \
         gc_hal_kernel_event.o \
-        gc_hal_kernel_heap.o \
         gc_hal_kernel_mmu.o \
         gc_hal_kernel_video_memory.o \
         gc_hal_kernel_power.o \
