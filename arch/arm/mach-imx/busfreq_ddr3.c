@@ -101,7 +101,9 @@ extern unsigned long mx6_ddr3_freq_change_end asm("mx6_ddr3_freq_change_end");
 extern unsigned long imx6sx_ddr3_freq_change_start asm("imx6sx_ddr3_freq_change_start");
 extern unsigned long imx6sx_ddr3_freq_change_end asm("imx6sx_ddr3_freq_change_end");
 #ifdef CONFIG_SMP
+#ifdef CONFIG_SOC_IMX6Q
 static unsigned long wfe_freq_change_iram_base;
+#endif
 u32 *wait_for_ddr_freq_update;
 static unsigned int online_cpus;
 static u32 *irqs_used;
@@ -400,6 +402,7 @@ int update_ddr_freq_imx6q(int ddr_rate)
 	return 0;
 }
 
+#ifdef CONFIG_SOC_IMX6SX
 int init_mmdc_ddr3_settings_imx6sx(struct platform_device *busfreq_pdev)
 {
 	int i;
@@ -481,7 +484,9 @@ int init_mmdc_ddr3_settings_imx6sx(struct platform_device *busfreq_pdev)
 
 	return 0;
 }
+#endif
 
+#ifdef CONFIG_SOC_IMX6Q
 int init_mmdc_ddr3_settings_imx6q(struct platform_device *busfreq_pdev)
 {
 	int i;
@@ -648,3 +653,4 @@ int init_mmdc_ddr3_settings_imx6q(struct platform_device *busfreq_pdev)
 
 	return 0;
 }
+#endif
