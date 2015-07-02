@@ -1713,9 +1713,6 @@ static int sdhci_get_ro(struct mmc_host *mmc)
 
 static void sdhci_enable_sdio_irq_nolock(struct sdhci_host *host, int enable)
 {
-	if (enable)
-		sdhci_runtime_pm_get(host);
-
 	if (host->flags & SDHCI_DEVICE_DEAD)
 		goto out;
 
@@ -1734,9 +1731,6 @@ static void sdhci_enable_sdio_irq_nolock(struct sdhci_host *host, int enable)
 		sdhci_mask_irqs(host, SDHCI_INT_CARD_INT);
 out:
 	mmiowb();
-
-	if (!enable)
-		sdhci_runtime_pm_put(host);
 }
 
 static void sdhci_enable_sdio_irq(struct mmc_host *mmc, int enable)
