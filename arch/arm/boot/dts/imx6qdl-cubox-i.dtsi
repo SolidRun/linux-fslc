@@ -45,6 +45,11 @@
 #include <dt-bindings/gpio/gpio.h>
 
 / {
+	aliases {
+		mmc0 = &usdhc2;
+		mmc1 = &usdhc1;
+	};
+
 	ir_recv: ir-receiver {
 		compatible = "gpio-ir-receiver";
 		gpios = <&gpio3 9 1>;
