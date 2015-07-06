@@ -49,6 +49,8 @@
 	phy-reset-duration = <2>;
 	phy-reset-gpios = <&gpio4 15 0>;
 	status = "okay";
+        assigned-clocks = <&clks IMX6QDL_CLK_ENET_REF>;
+        assigned-clock-rates = <25000000>;
 };
 
 &iomuxc {
