@@ -52,6 +52,19 @@
 	regulators {
 		compatible = "simple-bus";
 
+		reg_brcm_osc: brcm-osc-reg {
+			compatible = "regulator-fixed";
+			enable-active-high;
+			gpio = <&gpio5 5 0>;
+			pinctrl-names = "default";
+			pinctrl-0 = <&pinctrl_microsom_brcm_osc>;
+			regulator-name = "brcm_osc_reg";
+			regulator-min-microvolt = <3300000>;
+			regulator-max-microvolt = <3300000>;
+			regulator-always-on;
+			regulator-boot-on;
+		};
+
 		reg_brcm: brcm-reg {
 			compatible = "regulator-fixed";
 			enable-active-high;
@@ -150,10 +163,11 @@
 
 /* USDHC1 - Connected to optional BRCM Wifi/BT/FM */
 &usdhc1 {
+	card-external-vcc-supply = <&reg_brcm>;
+	card-reset-gpios = <&gpio5 26 GPIO_ACTIVE_LOW>, <&gpio6 0 GPIO_ACTIVE_LOW>;
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_microsom_brcm_wifi &pinctrl_microsom_usdhc1>;
 	bus-width = <4>;
-	mmc-pwrseq = <&usdhc1_pwrseq>;
 	keep-power-in-suspend;
 	non-removable;
 	vmmc-supply = <&reg_brcm>;
