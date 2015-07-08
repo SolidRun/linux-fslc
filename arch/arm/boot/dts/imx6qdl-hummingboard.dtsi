@@ -144,10 +144,20 @@
 		hdmi-controller = <&hdmi_audio>;
 	};
 
-        v4l2_out {
-                compatible = "fsl,mxc_v4l2_output";
-                status = "okay";
-        };
+	v4l2_cap_0 {
+		compatible = "fsl,imx6q-v4l2-capture";
+		ipu_id = <0>;
+		csi_id = <1>;
+		mclk_source = <0>;
+		mipi_camera = <1>;
+		default_input = <1>;
+		status = "okay";
+	};
+
+	v4l2_out {
+		compatible = "fsl,mxc_v4l2_output";
+		status = "okay";
+	};
 };
 
 &audmux {
@@ -204,21 +214,6 @@
 		VDDA-supply = <&reg_3p3v>;
 		VDDIO-supply = <&reg_3p3v>;
 	};
-
-	v4l2_cap_0 {
-		compatible = "fsl,imx6q-v4l2-capture";
-		ipu_id = <0>;
-		csi_id = <1>;
-		mclk_source = <0>;
-		mipi_camera = <1>;
-		default_input = <1>;
-		status = "okay";
-	};
-
-	v4l2_out {
-		compatible = "fsl,mxc_v4l2_output";
-		status = "okay";
-	};
 };
 
 &i2c2 {
@@ -226,11 +221,6 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_hummingboard_i2c2>;
 	status = "okay";
-
-	ddc: imx6_hdmi_i2c@50 {
-		compatible = "fsl,imx6-hdmi-i2c";
-		reg = <0x50>;
-	};
 
 	/* Raspberry Pi camera rev 1.3 */
 	ov5647_mipi: ov5647_mipi@36 {
@@ -251,6 +241,11 @@
 		pinctrl-names = "default";
 		pinctrl-0 = <&pinctrl_hummingboard_mipi>;
 		extended-buffer;
+	};
+
+	ddc: imx6_hdmi_i2c@50 {
+		compatible = "fsl,imx6-hdmi-i2c";
+		reg = <0x50>;
 	};
 };
 
@@ -427,7 +422,7 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_hummingboard_pcie_reset>;
 	reset-gpio = <&gpio3 4 0>;
-	status = "okay";
+	status = "disabled";
 };
 
 &pwm1 {
