@@ -422,7 +422,7 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_hummingboard_pcie_reset>;
 	reset-gpio = <&gpio3 4 0>;
-	status = "disabled";
+	status = "okay";
 };
 
 &pwm1 {
