@@ -48,6 +48,11 @@
 	aliases {
 		mmc0 = &usdhc2;
 		mmc1 = &usdhc1;
+		mxcfb0 = &mxcfb1;
+	};
+
+	chosen {
+		bootargs = "quiet console=ttymxc0,115200 root=/dev/mmcblk0p2 rw";
 	};
 
 	ir_recv: ir-receiver {
@@ -55,6 +60,30 @@
 		gpios = <&gpio3 9 1>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&pinctrl_cubox_i_ir>;
+		linux,rc-map-name = "rc-rc6-mce";
+	};
+
+	mxcfb1: fb@0 {
+		compatible = "fsl,mxc_sdc_fb";
+		disp_dev = "hdmi";
+		interface_pix_fmt = "RGB24";
+		mode_str ="1920x1080M@60";
+		default_bpp = <32>;
+		int_clk = <0>;
+		late_init = <0>;
+		status = "okay";
+	};
+
+	gpio-keys {
+		compatible = "gpio-keys";
+		pinctrl-0 = <&pinctrl_gpio_key>;
+		pinctrl-names = "default";
+
+		button_0 {
+			label = "Button 0";
+			gpios = <&gpio3 8 GPIO_ACTIVE_LOW>;
+			linux,code = <BTN_0>;
+		};
 	};
 
 	pwmleds {
@@ -112,17 +141,34 @@
 		spdif-out;
 	};
 
-	gpio-keys {
-		compatible = "gpio-keys";
-		pinctrl-0 = <&pinctrl_gpio_key>;
-		pinctrl-names = "default";
+        sound-hdmi {
+                compatible = "fsl,imx6q-audio-hdmi",
+                             "fsl,imx-audio-hdmi";
+                model = "imx-audio-hdmi";
+                hdmi-controller = <&hdmi_audio>;
+        };
+};
 
-		button_0 {
-			label = "Button 0";
-			gpios = <&gpio3 8 GPIO_ACTIVE_LOW>;
-			linux,code = <BTN_0>;
-		};
-	};
+&hdmi_core {
+	ipu_id = <0>;
+	disp_id = <0>;
+	status = "okay";
+};
+
+&hdmi_video {
+	fsl,phy_reg_vlev = <0x0294>;
+	fsl,phy_reg_cksymtx = <0x800d>;
+	status = "okay";
+};
+
+&hdmi_audio {
+	status = "okay";
+};
+
+&hdmi_cec {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_cubox_i_hdmi>;
+	status = "okay";
 };
 
 &i2c2 {
@@ -130,6 +176,11 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_cubox_i_i2c2>;
 	status = "okay";
+
+	ddc: imx6_hdmi_i2c@50 {
+		compatible = "fsl,imx6-hdmi-i2c";
+		reg = <0x50>;
+	};
 };
 
 &i2c3 {
@@ -141,6 +192,7 @@
 	rtc: pcf8523@68 {
 		compatible = "nxp,pcf8523";
 		reg = <0x68>;
+		nxp,12p5_pf;
 	};
 };
 
