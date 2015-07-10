@@ -520,24 +520,25 @@ static int imx6_pcie_start_link(struct pcie_port *pp)
 out:
 	if (ret) {
 		dev_err(pp->dev, "Failed to bring link up!\n");
-		clk_disable_unprepare(imx6_pcie->pcie);
-		if (!IS_ENABLED(CONFIG_EP_MODE_IN_EP_RC_SYS)
-			&& !IS_ENABLED(CONFIG_RC_MODE_IN_EP_RC_SYS))
-			clk_disable_unprepare(imx6_pcie->pcie_bus);
-		clk_disable_unprepare(imx6_pcie->pcie_phy);
-		if (is_imx6sx_pcie(imx6_pcie)) {
-			/* Disable clks and power down PCIe PHY */
-			clk_disable_unprepare(imx6_pcie->pcie_inbound_axi);
-			release_bus_freq(BUS_FREQ_HIGH);
+		if (IS_ENABLED(CONFIG_PCI_IMX6SX_EXTREMELY_PWR_SAVE)) {
+			clk_disable_unprepare(imx6_pcie->pcie);
+			if (!IS_ENABLED(CONFIG_EP_MODE_IN_EP_RC_SYS)
+				&& !IS_ENABLED(CONFIG_RC_MODE_IN_EP_RC_SYS))
+				clk_disable_unprepare(imx6_pcie->pcie_bus);
+			clk_disable_unprepare(imx6_pcie->pcie_phy);
+			if (is_imx6sx_pcie(imx6_pcie)) {
+				/* Disable clks and power down PCIe PHY */
+				clk_disable_unprepare(imx6_pcie->pcie_inbound_axi);
 
-			/*
-			 * Power down PCIe PHY.
-			 */
-			regulator_disable(imx6_pcie->pcie_phy_regulator);
-		} else {
-			clk_disable_unprepare(imx6_pcie->ref_100m);
-			release_bus_freq(BUS_FREQ_HIGH);
+				/*
+				 * Power down PCIe PHY.
+				 */
+				regulator_disable(imx6_pcie->pcie_phy_regulator);
+			} else {
+				clk_disable_unprepare(imx6_pcie->ref_100m);
+			}
 		}
+		release_bus_freq(BUS_FREQ_HIGH);
 	} else {
 		tmp = readl(pp->dbi_base + 0x80);
 		dev_dbg(pp->dev, "Link up, Gen=%i\n", (tmp >> 16) & 0xf);
