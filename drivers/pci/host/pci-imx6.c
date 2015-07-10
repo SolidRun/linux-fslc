@@ -1254,7 +1254,7 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
 	} else {
 		ret = imx6_add_pcie_port(pp, pdev);
 		if (ret < 0)
-			return ret;
+			goto err;
 
 		platform_set_drvdata(pdev, imx6_pcie);
 
@@ -1264,6 +1264,8 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
 
 	return 0;
 err:
+	/* bring down link, so bootloader gets clean state in case of reboot */
+	imx6_pcie_assert_core_reset(&imx6_pcie->pp);
 	return ret;
 }
 
