@@ -197,6 +197,27 @@
 	pinctrl-0 = <&pinctrl_hummingboard_i2c1>;
 	status = "okay";
 
+	/* Raspberry Pi camera rev 1.3 */
+	ov5647_mipi: ov5647_mipi@36 {
+		compatible = "ovti,ov5647_mipi";
+		reg = <0x36>;
+		/* Pi camera has its own 25MHz clock. */
+		clocks = <&clks 0>;
+		clock-names = "csi_mclk";
+		DOVDD-supply = <&reg_3p3v>;
+		AVDD-supply = <&reg_3p3v>;
+		DVDD-supply = <&reg_3p3v>;
+		pwn-gpios = <&gpio2 10 GPIO_ACTIVE_HIGH>;
+		led-gpios = <&gpio6 15 GPIO_ACTIVE_HIGH>;
+		ipu_id = <0>;
+		csi_id = <1>;
+		mclk = <25000000>;
+		mclk_source = <0>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_hummingboard_mipi>;
+		extended-buffer;
+	};
+
 	/* Pro baseboard model */
 	rtc: pcf8523@68 {
 		compatible = "nxp,pcf8523";
@@ -221,27 +242,6 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_hummingboard_i2c2>;
 	status = "okay";
-
-	/* Raspberry Pi camera rev 1.3 */
-	ov5647_mipi: ov5647_mipi@36 {
-		compatible = "ovti,ov5647_mipi";
-		reg = <0x36>;
-		/* Pi camera has its own 25MHz clock. */
-		clocks = <&clks 0>;
-		clock-names = "csi_mclk";
-		DOVDD-supply = <&reg_3p3v>;
-		AVDD-supply = <&reg_3p3v>;
-		DVDD-supply = <&reg_3p3v>;
-		pwn-gpios = <&gpio2 10 GPIO_ACTIVE_HIGH>;
-		led-gpios = <&gpio6 15 GPIO_ACTIVE_HIGH>;
-		ipu_id = <0>;
-		csi_id = <1>;
-		mclk = <25000000>;
-		mclk_source = <0>;
-		pinctrl-names = "default";
-		pinctrl-0 = <&pinctrl_hummingboard_mipi>;
-		extended-buffer;
-	};
 
 	ddc: imx6_hdmi_i2c@50 {
 		compatible = "fsl,imx6-hdmi-i2c";
