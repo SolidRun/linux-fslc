@@ -446,7 +446,7 @@ static int imx6_pcie_wait_for_link(struct pcie_port *pp)
 		if (--count)
 			continue;
 
-		dev_err(pp->dev, "phy link never came up\n");
+		dev_info(pp->dev, "phy link never came up\n");
 		dev_dbg(pp->dev, "DEBUG_R0: 0x%08x, DEBUG_R1: 0x%08x\n",
 			readl(pp->dbi_base + PCIE_PHY_DEBUG_R0),
 			readl(pp->dbi_base + PCIE_PHY_DEBUG_R1));
@@ -519,7 +519,7 @@ static int imx6_pcie_start_link(struct pcie_port *pp)
 
 out:
 	if (ret) {
-		dev_err(pp->dev, "Failed to bring link up!\n");
+		dev_info(pp->dev, "Failed to bring link up!\n");
 		if (IS_ENABLED(CONFIG_PCI_IMX6SX_EXTREMELY_PWR_SAVE)) {
 			clk_disable_unprepare(imx6_pcie->pcie);
 			if (!IS_ENABLED(CONFIG_EP_MODE_IN_EP_RC_SYS)
@@ -645,7 +645,7 @@ static int imx6_pcie_link_up(struct pcie_port *pp)
 	if ((debug_r0 & 0x3f) != 0x0d)
 		return 0;
 
-	dev_err(pp->dev, "transition to gen2 is stuck, reset PHY!\n");
+	dev_warn(pp->dev, "transition to gen2 is stuck, reset PHY!\n");
 	dev_dbg(pp->dev, "debug_r0=%08x debug_r1=%08x\n", debug_r0, rc);
 
 	imx6_pcie_reset_phy(pp);
@@ -684,7 +684,7 @@ static int __init imx6_add_pcie_port(struct pcie_port *pp,
 
 	ret = dw_pcie_host_init(pp);
 	if (ret) {
-		dev_err(&pdev->dev, "failed to initialize host\n");
+		dev_warn(&pdev->dev, "failed to initialize host\n");
 		return ret;
 	}
 
