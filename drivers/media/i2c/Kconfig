@@ -296,6 +296,7 @@ config VIDEO_SAA7191
 config VIDEO_TC358743
 	tristate "Toshiba TC358743 decoder"
 	depends on VIDEO_V4L2 && I2C
+	select MEDIA_CONTROLLER
 	---help---
 	  Support for the Toshiba TC358743 HDMI to MIPI CSI-2 bridge
 

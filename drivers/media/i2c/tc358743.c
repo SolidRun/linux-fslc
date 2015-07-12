@@ -1465,9 +1465,6 @@ static int tc358743_g_dv_timings(struct v4l2_subdev *sd,
 static int tc358743_enum_dv_timings(struct v4l2_subdev *sd,
 				    struct v4l2_enum_dv_timings *timings)
 {
-	if (timings->pad != 0)
-		return -EINVAL;
-
 	return v4l2_enum_dv_timings_cap(timings,
 			&tc358743_timings_cap, NULL, NULL);
 }
@@ -1497,9 +1494,6 @@ static int tc358743_query_dv_timings(struct v4l2_subdev *sd,
 static int tc358743_dv_timings_cap(struct v4l2_subdev *sd,
 		struct v4l2_dv_timings_cap *cap)
 {
-	if (cap->pad != 0)
-		return -EINVAL;
-
 	*cap = tc358743_timings_cap;
 
 	return 0;
@@ -1639,6 +1633,8 @@ static const struct v4l2_subdev_video_ops tc358743_video_ops = {
 	.query_dv_timings = tc358743_query_dv_timings,
 	.g_mbus_config = tc358743_g_mbus_config,
 	.s_stream = tc358743_s_stream,
+	.enum_dv_timings = tc358743_enum_dv_timings,
+	.dv_timings_cap = tc358743_dv_timings_cap,
 };
 
 static const struct v4l2_subdev_pad_ops tc358743_pad_ops = {
@@ -1646,8 +1642,6 @@ static const struct v4l2_subdev_pad_ops tc358743_pad_ops = {
 	.get_fmt = tc358743_get_fmt,
 	.get_edid = tc358743_g_edid,
 	.set_edid = tc358743_s_edid,
-	.enum_dv_timings = tc358743_enum_dv_timings,
-	.dv_timings_cap = tc358743_dv_timings_cap,
 };
 
 static const struct v4l2_subdev_ops tc358743_ops = {
@@ -1709,7 +1703,7 @@ static int tc358743_probe_of(struct tc358743_state *state)
 		return PTR_ERR(refclk);
 	}
 
-	ep = of_graph_get_next_endpoint(dev->of_node, NULL);
+	ep = v4l2_of_get_next_endpoint(dev->of_node, NULL);
 	if (ep) {
 		struct v4l2_of_endpoint endpoint;
 
