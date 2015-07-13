@@ -1788,13 +1788,12 @@ static int tc358743_probe_of(struct tc358743_state *state)
 	state->pdata.v_pi_rst = 0;
 
 	state->reset_gpio = devm_gpiod_get(dev, "reset");
-	if (IS_ERR(state->reset_gpio)) {
-		dev_err(dev, "failed to get reset gpio\n");
-		clk_disable_unprepare(refclk);
-		return PTR_ERR(state->reset_gpio);
+	if (!IS_ERR(state->reset_gpio)) {
+		tc358743_gpio_reset(state);
+	} else {
+		dev_warn(dev, "failed to get reset gpio\n");
 	}
 
-	tc358743_gpio_reset(state);
 
 	return 0;
 }
