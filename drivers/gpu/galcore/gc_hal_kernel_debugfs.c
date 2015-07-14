@@ -475,10 +475,12 @@ _DebugFSPrint (
         return - ERESTARTSYS ;
     }
 
+/*
     if(down_interruptible( gcmkNODE_SEM ( gc_dbgfs.currentNode ) ) )
     {
          return - ERESTARTSYS ;
     }
+*/
     len = vsnprintf ( buffer , sizeof (buffer ) , Message , *( va_list * ) Arguments ) ;
     buffer[len] = '\0' ;
 
@@ -490,7 +492,9 @@ _DebugFSPrint (
     }
     res = _AppendString ( gc_dbgfs.currentNode , buffer , len ) ;
     up ( gcmkNODE_SEM ( gc_dbgfs.currentNode ) ) ;
+#if 0
     wake_up_interruptible ( gcmkNODE_READQ ( gc_dbgfs.currentNode ) ) ; /* blocked in read*/
+#endif
     return res;
 }
 
