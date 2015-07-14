@@ -4723,14 +4723,19 @@ gckOS_MapUserMemory(
 
         if (Physical != ~0U)
         {
+            unsigned long pfn = Physical >> PAGE_SHIFT;
             for (i = 0; i < pageCount; i++)
             {
-                pages[i] = pfn_to_page((Physical >> PAGE_SHIFT) + i);
-
-                if (pfn_valid(page_to_pfn(pages[i])))
+                if (!pfn_valid(pfn + i))
                 {
-                    get_page(pages[i]);
+                    gcmkONERROR(gcvSTATUS_INVALID_ARGUMENT);
                 }
+            }
+
+            for (i = 0; i < pageCount; i++)
+            {
+                pages[i] = pfn_to_page(pfn + i);
+                get_page(pages[i]);
             }
         }
         else
@@ -4759,13 +4764,11 @@ gckOS_MapUserMemory(
                 {
                     for (i = 0; i < result; i++)
                     {
-                        if (pages[i] == gcvNULL)
+                        if (pages[i] != gcvNULL)
                         {
-                            break;
+                            page_cache_release(pages[i]);
+                            pages[i] = gcvNULL;
                         }
-
-                        page_cache_release(pages[i]);
-                        pages[i] = gcvNULL;
                     }
 
                     result = 0;
@@ -4783,6 +4786,7 @@ gckOS_MapUserMemory(
                     {
                         pgd_t * pgd = pgd_offset(current->mm, logical);
                         pud_t * pud = pud_offset(pgd, logical);
+                        unsigned long pfn;
 
                         if (pud)
                         {
@@ -4798,8 +4802,16 @@ gckOS_MapUserMemory(
                             gcmkONERROR(gcvSTATUS_OUT_OF_RESOURCES);
                         }
 
-                        pages[i] = pte_page(*pte);
+                        if (pte_present(*pte))
+                            pfn = pte_pfn(*pte);
+                        else
+                            pfn = ~0UL; 
                         pte_unmap_unlock(pte, ptl);
+
+                        if (pfn == ~0UL || !pfn_valid(pfn))
+                            gcmkONERROR(gcvSTATUS_OUT_OF_RESOURCES);
+
+                        pages[i] = pfn_to_page(pfn);
 
                         /* Advance to next. */
                         logical += PAGE_SIZE;
