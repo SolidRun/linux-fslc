@@ -2103,16 +2103,6 @@ gckEVENT_Notify(
 #endif
         spin_unlock_irqrestore(&Event->kernel->irq_lock, flags);
 
-        if (pending == 0)
-        {
-            /* Release the mutex queue. */
-            gcmkONERROR(gckOS_ReleaseMutex(Event->os, Event->eventQueueMutex));
-            acquired = gcvFALSE;
-
-            /* No more pending interrupts - done. */
-            break;
-        }
-
         if (pending & 0x80000000)
         {
             gctUINT32 AQAxiStatus = 0;
@@ -2127,6 +2117,12 @@ gckEVENT_Notify(
             gckHARDWARE_DumpMMUException(Event->kernel->hardware);
 
             pending &= 0xBFFFFFFF;
+        }
+
+        if (pending == 0)
+        {
+            /* No more pending interrupts - done. */
+            break;
         }
 
         gcmkTRACE_ZONE_N(
