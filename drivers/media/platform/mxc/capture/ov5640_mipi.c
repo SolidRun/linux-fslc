@@ -1103,7 +1103,7 @@ void OV5640_turn_on_AE_AG(int enable)
 	ov5640_write_reg(0x3503, ae_ag_ctrl);
 }
 
-bool binning_on(void)
+bool ov5640_binning_on(void)
 {
 	u8 temp;
 	ov5640_read_reg(0x3821, &temp);
@@ -1199,7 +1199,7 @@ static int ov5640_change_mode_exposure_calc(enum ov5640_frame_rate frame_rate,
 
 	/* read preview shutter */
 	prev_shutter = OV5640_get_shutter();
-	if ((binning_on()) && (mode != ov5640_mode_720P_1280_720)
+	if ((ov5640_binning_on()) && (mode != ov5640_mode_720P_1280_720)
 			&& (mode != ov5640_mode_1080P_1920_1080))
 		prev_shutter *= 2;
 
