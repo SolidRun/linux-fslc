@@ -81,6 +81,7 @@
 			regulator-name = "3P3V";
 			regulator-min-microvolt = <3300000>;
 			regulator-max-microvolt = <3300000>;
+			regulator-always-on;
 		};
 
 		reg_usbh1_vbus: usb-h1-vbus {
@@ -227,11 +228,11 @@
 
 	/* Pro baseboard model */
 	sgtl5000: sgtl5000@0a {
-		clocks = <&clks IMX6QDL_CLK_CKO>;
 		compatible = "fsl,sgtl5000";
+		reg = <0x0a>;
+		clocks = <&clks IMX6QDL_CLK_CKO>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&pinctrl_hummingboard_sgtl5000>;
-		reg = <0x0a>;
 		VDDA-supply = <&reg_3p3v>;
 		VDDIO-supply = <&reg_3p3v>;
 	};
@@ -414,7 +415,7 @@
 	csi_id = <1>;
 	v_channel = <0>;
 	lanes = <2>;
-	mipi_dphy_clk = <0x28>;
+	mipi_dphy_clk = /bits/ 8 <0x28>;
 	status = "okay";
 };
 
