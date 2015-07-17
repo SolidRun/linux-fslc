@@ -1281,6 +1281,7 @@ gckCOMMAND_Commit(
     /* Context switch required? */
     if (Context == gcvNULL)
     {
+#if 0
         /* See if we have to switch pipes for the command buffer. */
         if (commandBufferObject->entryPipe == Command->pipeSelect)
         {
@@ -1288,6 +1289,7 @@ gckCOMMAND_Commit(
             offset = pipeBytes;
         }
         else
+#endif
         {
             /* The current hardware and the entry command buffer pipes
             ** are different, switch to the correct pipe. */
