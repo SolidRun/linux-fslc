@@ -88,8 +88,8 @@ extern "C" {
 #define gcmIS_DEBUG(flag)       ( gcdDEBUG & (flag | gcdDEBUG_ALL) )
 
 #ifndef gcdDEBUG
-#if (defined(DBG) && DBG) || defined(DEBUG) || defined(_DEBUG)
-#       define gcdDEBUG         gcdDEBUG_ALL
+#if defined(DEBUG)
+#       define gcdDEBUG         ( gcdDEBUG_FATAL | gcdDEBUG_TRACE | gcdDEBUG_BREAK | gcdDEBUG_ASSERT )
 #   else
 #       define gcdDEBUG         gcdDEBUG_NONE
 #   endif

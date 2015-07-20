@@ -52,7 +52,7 @@ typedef gctTHREADFUNCRESULT (gctTHREADFUNCTYPE * gctTHREADFUNC) (
 #define gcdFORCE_MESSAGES 0
 
 
-#if DBG || defined(DEBUG) || defined(_DEBUG) || gcdFORCE_DEBUG
+#if defined(DEBUG)
 #   define gcvDEBUG 1
 #else
 #   define gcvDEBUG 0

@@ -27,7 +27,7 @@
 \******************************************************************************/
 
 static gceSTATUS _lastError  = gcvSTATUS_OK;
-static gctUINT32 _debugLevel = gcvLEVEL_INFO;
+static gctUINT32 _debugLevel = gcvLEVEL_ERROR;
 /*
 _debugZones config value
 Please Reference define in gc_hal_base.h

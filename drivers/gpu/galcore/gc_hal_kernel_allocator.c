@@ -848,7 +848,7 @@ gckOS_ImportAllocators(
         }
     }
 
-#if gcdDEBUG
+#if DEBUG
     list_for_each_entry(allocator, &Os->allocatorList, head)
     {
         gcmkTRACE_ZONE(
