@@ -811,6 +811,7 @@ config SOC_IMX6
 	select HAVE_SMP
 	select MFD_SYSCON
 	select PL310_ERRATA_769419 if CACHE_PL310
+	select ARM_IMX6Q_CPUFREQ
 
 config SOC_IMX6Q
 	bool "i.MX6 Quad/DualLite support"
