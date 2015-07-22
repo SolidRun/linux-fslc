@@ -1,4 +1,4 @@
-if VIDEO_MXC_CAPTURE
+if VIDEO_MXC_CAPTURE && SOC_IMX6SX
 
 config VIDEO_MXC_CSI_CAMERA
 	tristate "CSI camera support"
