@@ -93,6 +93,7 @@
 };
 
 &usdhc3 {
+	non-removable;
 	status = "okay";
 };
 

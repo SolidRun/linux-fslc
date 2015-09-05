@@ -72,6 +72,7 @@
 
 &usdhc3 {
 	wp-gpios = <&gpio7 0 0>;
+	cd-gpios = <&gpio7 1 0>;
 	status = "okay";
 };
 

@@ -20,6 +20,10 @@
 / {
 	model = "CompuLab CM-FX6 on SBC-FX6m";
 	compatible = "compulab,cm-fx6", "compulab,sbc-fx6m", "fsl,imx6q";
+	
+	aliases {
+		mmc0 = &usdhc3;
+	};
 };
 
 &hdmi_core {
