@@ -153,6 +153,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
 	imx53-mba53.dtb \
 	imx53-qsb.dtb \
 	imx53-smd.dtb \
+	imx6dl-cm-fx6.dtb \
 	imx6dl-cubox-i.dtb \
 	imx6dl-hummingboard.dtb \
 	imx6dl-hummingboard2.dtb \
@@ -166,8 +167,11 @@ dtb-$(CONFIG_ARCH_MXC) += \
 	imx6dl-sabresd-pf200.dtb \
 	imx6dl-sabresd-hdcp.dtb \
 	imx6dl-udoo.dtb \
+	imx6dl-sbc-fx6.dtb \
+	imx6dl-sbc-fx6m.dtb \
 	imx6dl-wandboard.dtb \
 	imx6q-arm2.dtb \
+	imx6q-cm-fx6.dtb \
 	imx6q-cubox-i.dtb \
 	imx6q-hummingboard.dtb \
 	imx6q-hummingboard2.dtb \
@@ -183,6 +187,8 @@ dtb-$(CONFIG_ARCH_MXC) += \
 	imx6q-sabresd-uart.dtb \
 	imx6q-sabresd-hdcp.dtb \
 	imx6q-sabresd-ldo.dtb \
+	imx6q-sbc-fx6.dtb \
+	imx6q-sbc-fx6m.dtb \
 	imx6q-sbc6x.dtb \
 	imx6q-udoo.dtb \
 	imx6q-wandboard.dtb \
