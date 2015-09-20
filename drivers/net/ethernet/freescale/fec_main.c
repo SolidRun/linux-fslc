@@ -3456,6 +3456,8 @@ failed_register:
 failed_mii_init:
 failed_irq:
 failed_init:
+	if (fep->bufdesc_ex)
+		cancel_delayed_work_sync(&fep->time_keep);
 	if (fep->reg_phy)
 		regulator_disable(fep->reg_phy);
 	if (fep->ptp_clock)
@@ -3477,7 +3479,8 @@ fec_drv_remove(struct platform_device *pdev)
 	struct net_device *ndev = platform_get_drvdata(pdev);
 	struct fec_enet_private *fep = netdev_priv(ndev);
 
-	cancel_delayed_work_sync(&fep->time_keep);
+	if (fep->bufdesc_ex)
+		cancel_delayed_work_sync(&fep->time_keep);
 	cancel_work_sync(&fep->tx_timeout_work);
 	unregister_netdev(ndev);
 	fec_enet_mii_remove(fep);
