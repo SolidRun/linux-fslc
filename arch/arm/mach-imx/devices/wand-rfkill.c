@@ -27,94 +27,94 @@
 #include <linux/module.h>
 #include <linux/slab.h>
 
+#define REVISION_B0			0
+#define REVISION_C1			1
+
+#define GPIO_COUNT			8
+#define GPIO_WIFI_REG			0
+#define GPIO_WIFI_REF			1
+#define GPIO_WIFI_RST			2
+#define GPIO_WIFI_WAKE			3
+#define GPIO_WIFI_HOST_WAKE		4
+#define GPIO_BT_RST 			5
+#define GPIO_BT_WAKE 			6
+#define GPIO_BT_HOST_WAKE		7
+
+#define DEVICE_COUNT			2
+#define DEVICE_WIFI 			0
+#define DEVICE_BLUETOOTH		1
 
 struct wand_rfkill_data {
+	unsigned int *gpios;
+	struct wand_rfkill_dev *devices;
+	int revision;
+};
+
+struct wand_rfkill_dev {
 	struct rfkill *rfkill_dev;
-	int shutdown_gpio;
+	unsigned int *shutdown_gpios;
+	unsigned int shutdown_gpios_count;
 	const char *shutdown_name;
 };
 
-static int wand_rfkill_set_block(void *data, bool blocked)
+static int wand_rfkill_dev_set_block(void *data, bool blocked)
 {
-	struct wand_rfkill_data *rfkill = data;
+	int i;
+	struct wand_rfkill_dev *device = data;
 
-	pr_debug("wandboard-rfkill: set block %d\n", blocked);
+	pr_debug("wandboard-rfkill: dev %s: set block %d\n", device->shutdown_name, blocked);
 
 	if (blocked) {
-		if (gpio_is_valid(rfkill->shutdown_gpio))
-			gpio_direction_output(rfkill->shutdown_gpio, 0);
+		for(i = 0; i < device->shutdown_gpios_count;i++) {
+			gpio_set_value(device->shutdown_gpios[i], 0);
+		}
 	} else {
-		if (gpio_is_valid(rfkill->shutdown_gpio))
-			gpio_direction_output(rfkill->shutdown_gpio, 1);
+		for(i = device->shutdown_gpios_count - 1; i > 0;i--) {
+			gpio_set_value(device->shutdown_gpios[i], 1);
+			msleep(10);
+		}
 	}
 
 	return 0;
 }
 
 static const struct rfkill_ops wand_rfkill_ops = {
-	.set_block = wand_rfkill_set_block,
+	.set_block = wand_rfkill_dev_set_block,
 };
 
 static int wand_rfkill_wifi_probe(struct device *dev,
-		struct device_node *np,
-		struct wand_rfkill_data *rfkill,
-		int wand_rev)
-{
+	struct wand_rfkill_data *rfkill)
+	{
 	int ret;
-	int wl_ref_on, wl_rst_n, wl_reg_on, wl_wake, wl_host_wake;
 
-	wl_reg_on = of_get_named_gpio(np, "wifi-reg-on", 0);
-	wl_wake = of_get_named_gpio(np, "wifi-wake", 0);
-	wl_host_wake = of_get_named_gpio(np, "wifi-host-wake", 0);
-
-	if(wand_rev){
-		wl_ref_on = of_get_named_gpio(np, "wifi-ref-on-revc1", 0);
-		wl_rst_n = wl_reg_on;
-	}
-	else {
-		wl_ref_on = of_get_named_gpio(np, "wifi-ref-on", 0);
-		wl_rst_n = of_get_named_gpio(np, "wifi-rst-n", 0);
-	}
-
-	if (!gpio_is_valid(wl_rst_n) || !gpio_is_valid(wl_ref_on) ||
-			!gpio_is_valid(wl_reg_on) || !gpio_is_valid(wl_wake) ||
-			!gpio_is_valid(wl_host_wake)) {
-
-		dev_err(dev, "incorrect wifi gpios (%d %d %d %d %d)\n",
-				wl_rst_n, wl_ref_on, wl_reg_on, wl_wake, wl_host_wake);
-		return -EINVAL;
-	}
+	rfkill->devices[DEVICE_WIFI].shutdown_gpios = kzalloc(sizeof(unsigned int) * 4, GFP_KERNEL);
+	if(!rfkill->devices[DEVICE_WIFI].shutdown_gpios)
+		return -ENOMEM;
 
 	dev_info(dev, "initialize wifi chip\n");
 
-	gpio_request(wl_rst_n, "wl_rst_n");
-	gpio_direction_output(wl_rst_n, 0);
-	msleep(11);
-	gpio_set_value(wl_rst_n, 1);
+	/* Enable the WiFi part of the chip */
+	/* Enable power */
+	gpio_set_value(rfkill->gpios[GPIO_WIFI_REF], 1);
+	gpio_set_value(rfkill->gpios[GPIO_WIFI_REG], 1);
 
-	gpio_request(wl_ref_on, "wl_ref_on");
-	gpio_direction_output(wl_ref_on, 1);
+	/* Enable reset and set wake */
+	gpio_set_value(rfkill->gpios[GPIO_WIFI_RST], 1);
+	gpio_set_value(rfkill->gpios[GPIO_WIFI_WAKE], 1);
 
-	gpio_request(wl_reg_on, "wl_reg_on");
-	gpio_direction_output(wl_reg_on, 1);
+	rfkill->devices[DEVICE_WIFI].shutdown_name = "wifi_shutdown";
+	rfkill->devices[DEVICE_WIFI].shutdown_gpios[0] = rfkill->gpios[GPIO_WIFI_WAKE];
+	rfkill->devices[DEVICE_WIFI].shutdown_gpios[1] = rfkill->gpios[GPIO_WIFI_RST];
+	rfkill->devices[DEVICE_WIFI].shutdown_gpios[2] = rfkill->gpios[GPIO_WIFI_REG];
+	rfkill->devices[DEVICE_WIFI].shutdown_gpios[3] = rfkill->gpios[GPIO_WIFI_REF];
+	rfkill->devices[DEVICE_WIFI].shutdown_gpios_count = 4;
 
-	gpio_request(wl_wake, "wl_wake");
-	gpio_direction_output(wl_wake, 1);
+	rfkill->devices[DEVICE_WIFI].rfkill_dev = rfkill_alloc("wifi-rfkill", dev,
+		RFKILL_TYPE_WLAN, &wand_rfkill_ops, &(rfkill->devices[DEVICE_WIFI]));
+	if (!rfkill->devices[DEVICE_WIFI].rfkill_dev)
+		return -ENOMEM;
 
-	gpio_request(wl_host_wake, "wl_host_wake");
-	gpio_direction_input(wl_host_wake);
-
-	rfkill->shutdown_name = "wifi_shutdown";
-	rfkill->shutdown_gpio = wl_reg_on;
-
-	rfkill->rfkill_dev = rfkill_alloc("wifi-rfkill", dev, RFKILL_TYPE_WLAN,
-			&wand_rfkill_ops, rfkill);
-	if (!rfkill->rfkill_dev) {
-		ret = -ENOMEM;
-		goto wifi_fail_free_gpio;
-	}
-
-	ret = rfkill_register(rfkill->rfkill_dev);
+	ret = rfkill_register(rfkill->devices[DEVICE_WIFI].rfkill_dev);
 	if (ret < 0)
 		goto wifi_fail_unregister;
 
@@ -123,81 +123,46 @@ static int wand_rfkill_wifi_probe(struct device *dev,
 	return 0;
 
 wifi_fail_unregister:
-	rfkill_destroy(rfkill->rfkill_dev);
-wifi_fail_free_gpio:
-	if (gpio_is_valid(wl_rst_n))     gpio_free(wl_rst_n);
-	if (gpio_is_valid(wl_ref_on))    gpio_free(wl_ref_on);
-	if (gpio_is_valid(wl_reg_on))    gpio_free(wl_reg_on);
-	if (gpio_is_valid(wl_wake))      gpio_free(wl_wake);
-	if (gpio_is_valid(wl_host_wake)) gpio_free(wl_host_wake);
+	rfkill_destroy(rfkill->devices[DEVICE_WIFI].rfkill_dev);
 
 	return ret;
 }
 
 static int wand_rfkill_bt_probe(struct device *dev,
-		struct device_node *np,
-		struct wand_rfkill_data *rfkill,
-		int wand_rev)
+		struct wand_rfkill_data *rfkill)
 {
 	int ret;
-	int bt_on, bt_wake, bt_host_wake;
 
-	if(wand_rev) {
-	    bt_on = of_get_named_gpio(np, "bluetooth-on-revc1", 0);
-	    bt_wake = of_get_named_gpio(np, "bluetooth-wake-revc1", 0);
-	    bt_host_wake = of_get_named_gpio(np, "bluetooth-host-wake-revc1", 0);
-	}
-	else{
-	    bt_on = of_get_named_gpio(np, "bluetooth-on", 0);
-	    bt_wake = of_get_named_gpio(np, "bluetooth-wake", 0);
-	    bt_host_wake = of_get_named_gpio(np, "bluetooth-host-wake", 0);
-	}
-
-	if (!gpio_is_valid(bt_on) || !gpio_is_valid(bt_wake) ||
-			!gpio_is_valid(bt_host_wake)) {
-
-		dev_err(dev, "incorrect bt gpios (%d %d %d)\n",
-				bt_on, bt_wake, bt_host_wake);
-		return -EINVAL;
-	}
+	rfkill->devices[DEVICE_BLUETOOTH].shutdown_gpios = kzalloc(sizeof(unsigned int) * 2, GFP_KERNEL);
+	if(!rfkill->devices[DEVICE_BLUETOOTH].shutdown_gpios)
+		return -ENOMEM;
 
 	dev_info(dev, "initialize bluetooth chip\n");
+    /* Enable the Bluetooth part of the chip */
+    /* Enable reset and set wake */
+	gpio_set_value(rfkill->gpios[GPIO_BT_RST], 1);
+	gpio_set_value(rfkill->gpios[GPIO_BT_WAKE], 1);
 
-	gpio_request(bt_on, "bt_on");
-	gpio_direction_output(bt_on, 0);
-	msleep(11);
-	gpio_set_value(bt_on, 1);
+	rfkill->devices[DEVICE_BLUETOOTH].shutdown_name = "bluetooth_shutdown";
+	rfkill->devices[DEVICE_BLUETOOTH].shutdown_gpios[0] = rfkill->gpios[GPIO_BT_WAKE];
+	rfkill->devices[DEVICE_BLUETOOTH].shutdown_gpios[1] = rfkill->gpios[GPIO_BT_RST];
+	rfkill->devices[DEVICE_BLUETOOTH].shutdown_gpios_count = 2;
 
-	gpio_request(bt_wake, "bt_wake");
-	gpio_direction_output(bt_wake, 1);
+	rfkill->devices[DEVICE_BLUETOOTH].rfkill_dev = rfkill_alloc("bluetooth-rfkill", dev,
+			RFKILL_TYPE_BLUETOOTH, &wand_rfkill_ops, &(rfkill->devices[DEVICE_BLUETOOTH]));
+	if(!rfkill->devices[DEVICE_BLUETOOTH].rfkill_dev)
+		return -ENOMEM;
 
-	gpio_request(bt_host_wake, "bt_host_wake");
-	gpio_direction_input(bt_host_wake);
-
-	rfkill->shutdown_name = "bluetooth_shutdown";
-	rfkill->shutdown_gpio = bt_on;
-
-	rfkill->rfkill_dev = rfkill_alloc("bluetooth-rfkill", dev, RFKILL_TYPE_BLUETOOTH,
-			&wand_rfkill_ops, rfkill);
-	if (!rfkill->rfkill_dev) {
-		ret = -ENOMEM;
-		goto bt_fail_free_gpio;
-	}
-
-	ret = rfkill_register(rfkill->rfkill_dev);
-	if (ret < 0)
+	ret = rfkill_register(rfkill->devices[DEVICE_BLUETOOTH].rfkill_dev);
+	if(ret < 0)
 		goto bt_fail_unregister;
 
-	dev_info(dev, "bluetooth-rfkill registered.\n");
+	dev_info(dev, "bluetooth-rfkill registered\n");
 
 	return 0;
 
 bt_fail_unregister:
-	rfkill_destroy(rfkill->rfkill_dev);
-bt_fail_free_gpio:
-	if (gpio_is_valid(bt_on))        gpio_free(bt_on);
-	if (gpio_is_valid(bt_wake))      gpio_free(bt_wake);
-	if (gpio_is_valid(bt_host_wake)) gpio_free(bt_host_wake);
+	rfkill_destroy(rfkill->devices[DEVICE_BLUETOOTH].rfkill_dev);
 
 	return ret;
 }
@@ -207,22 +172,19 @@ static int wand_rfkill_probe(struct platform_device *pdev)
 	struct wand_rfkill_data *rfkill;
 	struct pinctrl *pinctrl;
 	int ret;
-	int wand_rev_gpio;
+	unsigned int wand_rev_gpio;
 	int wand_rev;
+	int i;
 
 	dev_info(&pdev->dev, "Wandboard rfkill initialization\n");
 
-	if (!pdev->dev.of_node) {
+	if(!pdev->dev.of_node) {
 		dev_err(&pdev->dev, "no device tree node\n");
 		return -ENODEV;
 	}
 
-	rfkill = kzalloc(sizeof(*rfkill) * 2, GFP_KERNEL);
-	if (!rfkill)
-		return -ENOMEM;
-
 	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
-	if (IS_ERR(pinctrl)) {
+	if(IS_ERR(pinctrl)) {
 		int ret = PTR_ERR(pinctrl);
 		dev_err(&pdev->dev, "failed to get default pinctrl: %d\n", ret);
 		return ret;
@@ -230,8 +192,7 @@ static int wand_rfkill_probe(struct platform_device *pdev)
 
 	/* GPIO for detecting C1 revision of Wandboard */
 	wand_rev_gpio = of_get_named_gpio(pdev->dev.of_node, "wand-rev-gpio", 0);
-	if (!gpio_is_valid(wand_rev_gpio)) {
-
+	if(!gpio_is_valid(wand_rev_gpio)) {
 		dev_err(&pdev->dev, "incorrect Wandboard revision check gpio (%d)\n",
 				wand_rev_gpio);
 		return -EINVAL;
@@ -242,35 +203,141 @@ static int wand_rfkill_probe(struct platform_device *pdev)
 			wand_rev_gpio);
 	gpio_direction_input(wand_rev_gpio);
 
+
+	rfkill = kzalloc(sizeof(struct wand_rfkill_data), GFP_KERNEL);
+	if (!rfkill)
+		return -ENOMEM;
+
 	/* Check Wandboard revision */
 	wand_rev = gpio_get_value(wand_rev_gpio);
-	if(wand_rev)
+	if(wand_rev) {
 		dev_info(&pdev->dev,"wandboard is rev C1\n");
-	else
+		rfkill->revision = REVISION_C1;
+	} else {
 		dev_info(&pdev->dev,"wandboard is rev B0\n");
+		rfkill->revision = REVISION_B0;
+	}
 
-	/* setup WiFi */
-	ret = wand_rfkill_wifi_probe(&pdev->dev, pdev->dev.of_node, &rfkill[0], wand_rev);
-	if (ret < 0)
+	gpio_free(wand_rev_gpio);
+
+	rfkill->gpios = kzalloc(sizeof(unsigned int) * GPIO_COUNT, GFP_KERNEL);
+	if(!rfkill->gpios) {
+		ret = -ENOMEM;
 		goto fail_free_rfkill;
+	}
 
-	/* setup bluetooth */
-	ret = wand_rfkill_bt_probe(&pdev->dev, pdev->dev.of_node, &rfkill[1], wand_rev);
-	if (ret < 0)
-		goto fail_unregister_wifi;
+	/* Initialize WiFi GPIOs */
+	rfkill->gpios[GPIO_WIFI_REG] = of_get_named_gpio(pdev->dev.of_node, "wifi-reg-on", 0);
+	rfkill->gpios[GPIO_WIFI_WAKE] = of_get_named_gpio(pdev->dev.of_node, "wifi-wake", 0);
+	rfkill->gpios[GPIO_WIFI_HOST_WAKE] = of_get_named_gpio(pdev->dev.of_node, "wifi-host-wake", 0);
+
+	if(rfkill->revision == REVISION_C1) {
+		rfkill->gpios[GPIO_WIFI_REF] = of_get_named_gpio(pdev->dev.of_node, "wifi-ref-on-revc1", 0);
+		rfkill->gpios[GPIO_WIFI_RST] = of_get_named_gpio(pdev->dev.of_node, "wifi-rst-n-revc1", 0);
+	} else if(rfkill->revision == REVISION_B0) {
+		rfkill->gpios[GPIO_WIFI_REF] = of_get_named_gpio(pdev->dev.of_node, "wifi-ref-on", 0);
+		rfkill->gpios[GPIO_WIFI_RST] = of_get_named_gpio(pdev->dev.of_node, "wifi-rst-n", 0);
+	}
+
+	if(!gpio_is_valid(rfkill->gpios[GPIO_WIFI_REG]) || !gpio_is_valid(rfkill->gpios[GPIO_WIFI_WAKE]) ||
+		!gpio_is_valid(rfkill->gpios[GPIO_WIFI_HOST_WAKE]) || !gpio_is_valid(rfkill->gpios[GPIO_WIFI_REF]) ||
+		!gpio_is_valid(GPIO_WIFI_RST)) {
+
+		dev_err(&pdev->dev, "incorrect wifi gpios (%d %d %d %d %d)\n",
+				rfkill->gpios[GPIO_WIFI_REG], rfkill->gpios[GPIO_WIFI_WAKE],
+				rfkill->gpios[GPIO_WIFI_HOST_WAKE], rfkill->gpios[GPIO_WIFI_REF],
+				rfkill->gpios[GPIO_WIFI_RST]);
+		ret = -EINVAL;
+		goto fail_free_gpios;
+	}
+
+	/* Initialize BT GPIOs */
+	if(rfkill->revision == REVISION_C1) {
+		rfkill->gpios[GPIO_BT_RST] = of_get_named_gpio(pdev->dev.of_node, "bluetooth-on-revc1", 0);
+		rfkill->gpios[GPIO_BT_WAKE] = of_get_named_gpio(pdev->dev.of_node, "bluetooth-wake-revc1", 0);
+		rfkill->gpios[GPIO_BT_HOST_WAKE] = of_get_named_gpio(pdev->dev.of_node, "bluetooth-host-wake-revc1", 0);
+	} else if(rfkill->revision == REVISION_B0) {
+		rfkill->gpios[GPIO_BT_RST] = of_get_named_gpio(pdev->dev.of_node, "bluetooth-on", 0);
+		rfkill->gpios[GPIO_BT_WAKE] = of_get_named_gpio(pdev->dev.of_node, "bluetooth-wake", 0);
+		rfkill->gpios[GPIO_BT_HOST_WAKE] = of_get_named_gpio(pdev->dev.of_node, "bluetooth-host-wake", 0);
+	}
+
+	if(!gpio_is_valid(rfkill->gpios[GPIO_BT_RST]) || !gpio_is_valid(rfkill->gpios[GPIO_BT_RST]) ||
+		!gpio_is_valid(rfkill->gpios[GPIO_BT_HOST_WAKE])) {
+
+		dev_err(&pdev->dev, "incorrect bt gpios (%d) (%d) (%d)\n",
+				rfkill->gpios[GPIO_BT_RST], rfkill->gpios[GPIO_BT_WAKE],
+				rfkill->gpios[GPIO_BT_HOST_WAKE]);
+		ret = -EINVAL;
+		goto fail_free_gpios;
+	}
+
+	dev_info(&pdev->dev, "Resetting bcm4329/bcm4330\n");
+	/* Initialize directions and set initial value to off, effectively resetting the chip */
+	/* Reset both WAKE pins to signal that the host doesn't want wifi or bt to be active */
+	gpio_request(rfkill->gpios[GPIO_WIFI_WAKE], "wl_wake");
+	gpio_direction_output(rfkill->gpios[GPIO_WIFI_WAKE], 0);
+	gpio_request(rfkill->gpios[GPIO_BT_WAKE], "bt_wake");
+	gpio_direction_output(rfkill->gpios[GPIO_BT_WAKE], 0);
+
+	/* Reset both RST pins to disable WiFi and BT */
+	gpio_request(rfkill->gpios[GPIO_WIFI_RST], "wl_rst");
+	gpio_direction_output(rfkill->gpios[GPIO_WIFI_RST], 0);
+	gpio_request(rfkill->gpios[GPIO_BT_RST], "bt_rst");
+	gpio_direction_output(rfkill->gpios[GPIO_BT_RST], 0);
+
+	/* Reset WL_REG to remove power from the internal regulators */
+	gpio_request(rfkill->gpios[GPIO_WIFI_REG], "wl_reg");
+	gpio_direction_output(rfkill->gpios[GPIO_WIFI_REG], 0);
+
+	/* Also reset WL_REF_ON ("Wifi Power Enable" according to dts) */
+	gpio_request(rfkill->gpios[GPIO_WIFI_REF], "wl_ref");
+	gpio_direction_output(rfkill->gpios[GPIO_WIFI_REF], 0);
+
+	/* Initialize both HOST_WAKE pins to input */
+	gpio_request(rfkill->gpios[GPIO_WIFI_HOST_WAKE], "wl_host_wake");
+	gpio_direction_input(rfkill->gpios[GPIO_WIFI_HOST_WAKE]);
+	gpio_request(rfkill->gpios[GPIO_BT_HOST_WAKE], "bt_host_wake");
+	gpio_direction_input(rfkill->gpios[GPIO_BT_HOST_WAKE]);
+
+	/* Sleep a generous amount of time to reset the chip */
+	msleep(100);
+
+	rfkill->devices = kzalloc(sizeof(struct wand_rfkill_dev) * DEVICE_COUNT, GFP_KERNEL);
+	if(!rfkill->devices) {
+		ret = -ENOMEM;
+		goto fail_free_requested_gpios;
+	}
+
+
+	/* Setup the WiFi part */
+	ret = wand_rfkill_wifi_probe(&pdev->dev, rfkill);
+	if(ret < 0)
+		goto fail_free_devices;
+
+	/* Setup the Bluetooth part */
+	ret = wand_rfkill_bt_probe(&pdev->dev, rfkill);
+	if(ret < 0)
+		goto fail_unregister_device_wifi;
 
 	platform_set_drvdata(pdev, rfkill);
 
 	return 0;
 
-fail_unregister_wifi:
-	if (rfkill[1].rfkill_dev) {
-		rfkill_unregister(rfkill[1].rfkill_dev);
-		rfkill_destroy(rfkill[1].rfkill_dev);
+fail_unregister_device_wifi:
+	if(rfkill->devices[DEVICE_WIFI].rfkill_dev) {
+		rfkill_unregister(rfkill->devices[DEVICE_WIFI].rfkill_dev);
+		rfkill_destroy(rfkill->devices[DEVICE_WIFI].rfkill_dev);
 	}
-
-	/* TODO free gpio */
-
+	kfree(rfkill->devices[DEVICE_WIFI].shutdown_gpios);
+fail_free_devices:
+	kfree(rfkill->devices);
+fail_free_requested_gpios:
+	for(i = 0; i < GPIO_COUNT; i++) {
+		gpio_free(rfkill->gpios[i]);
+	}
+fail_free_gpios:
+	kfree(rfkill->gpios);
 fail_free_rfkill:
 	kfree(rfkill);
 
@@ -283,24 +350,32 @@ static int wand_rfkill_remove(struct platform_device *pdev)
 
 	dev_info(&pdev->dev, "Module unloading\n");
 
-	if (!rfkill)
-		return 0;
+	if(rfkill) {
+		if(rfkill->devices) {
+			int i;
+			for(i = 0; i < DEVICE_COUNT; i++) {
+				if(rfkill->devices[i].rfkill_dev) {
+					rfkill_unregister(rfkill->devices[i].rfkill_dev);
+					rfkill_destroy(rfkill->devices[i].rfkill_dev);
+				}
+				if(rfkill->devices[i].shutdown_gpios) {
+					kfree(rfkill->devices[i].shutdown_gpios);
+				}
+			}
+			kfree(rfkill->devices);
+		}
 
-	/* WiFi */
-	if (gpio_is_valid(rfkill[0].shutdown_gpio))
-		gpio_free(rfkill[0].shutdown_gpio);
+		if(rfkill->gpios) {
+			int i;
+			for(i = 0; i < GPIO_COUNT; i++) {
+				if(gpio_is_valid(rfkill->gpios[i]))
+					gpio_free(rfkill->gpios[i]);
+			}
+			kfree(rfkill->gpios);
+		}
 
-	rfkill_unregister(rfkill[0].rfkill_dev);
-	rfkill_destroy(rfkill[0].rfkill_dev);
-
-	/* Bt */
-	if (gpio_is_valid(rfkill[1].shutdown_gpio))
-		gpio_free(rfkill[1].shutdown_gpio);
-
-	rfkill_unregister(rfkill[1].rfkill_dev);
-	rfkill_destroy(rfkill[1].rfkill_dev);
-
-	kfree(rfkill);
+		kfree(rfkill);
+	}
 
 	return 0;
 }
