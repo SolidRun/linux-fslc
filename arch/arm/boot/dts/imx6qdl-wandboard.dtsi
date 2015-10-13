@@ -110,6 +110,7 @@
                 bluetooth-host-wake-revc1 = <&gpio5 20 0>;
 
                 wifi-ref-on-revc1 = <&gpio5 31 0>; /* Controls external FET switch */
+		wifi-rst-n-revc1 = <&gpio6 0 0>;
 
 		/* Rev B/C probe gpio */
 		wand-rev-gpio = <&gpio2 28 0>;
