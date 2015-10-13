@@ -263,7 +263,7 @@
 
 		pinctrl_cubox_i_usdhc2_aux: cubox-i-usdhc2-aux {
 			fsl,pins = <
-				MX6QDL_PAD_GPIO_4__GPIO1_IO04    0x1f071
+				MX6QDL_PAD_GPIO_4__GPIO1_IO04    0x13071
 				MX6QDL_PAD_KEY_ROW1__SD2_VSELECT 0x1b071
 			>;
 		};

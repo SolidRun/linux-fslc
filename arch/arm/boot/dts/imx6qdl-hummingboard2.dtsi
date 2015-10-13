@@ -514,7 +514,7 @@
 
 		pinctrl_hummingboard2_usdhc2_aux: hummingboard2-usdhc2-aux {
 			fsl,pins = <
-				MX6QDL_PAD_GPIO_4__GPIO1_IO04    0x1f071
+				MX6QDL_PAD_GPIO_4__GPIO1_IO04    0x13071
 				MX6QDL_PAD_KEY_ROW1__SD2_VSELECT 0x1b071
 			>;
 		};
@@ -677,7 +677,7 @@
 		&pinctrl_hummingboard2_usdhc2_200mhz
 	>;
 
-	vmmc-supply = <&reg_usdhc2_vbus>;
+	card-external-vcc-supply = <&reg_usdhc2_vbus>;
 	cd-gpios = <&gpio1 4 0>;
 	status = "okay";
 };
