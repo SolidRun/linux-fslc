@@ -885,7 +885,7 @@ static void esdhc_set_uhs_signaling(struct sdhci_host *host, unsigned timing)
 		break;
 	}
 
-	return esdhc_change_pinstate(host, timing);
+	esdhc_change_pinstate(host, timing);
 }
 
 static unsigned int esdhc_get_max_timeout_counter(struct sdhci_host *host)

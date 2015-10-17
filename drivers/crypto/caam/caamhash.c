@@ -129,7 +129,7 @@ struct caam_hash_state {
 	int buflen_0;
 	u8 buf_1[CAAM_MAX_HASH_BLOCK_SIZE] ____cacheline_aligned;
 	int buflen_1;
-	u8 caam_ctx[MAX_CTX_LEN];
+	u8 caam_ctx[MAX_CTX_LEN] ____cacheline_aligned;
 	int (*update)(struct ahash_request *req);
 	int (*final)(struct ahash_request *req);
 	int (*finup)(struct ahash_request *req);
@@ -1733,6 +1733,7 @@ static int ahash_init(struct ahash_request *req)
 	state->final = ahash_final_no_ctx;
 
 	state->current_buf = 0;
+	state->buf_dma = 0;
 	state->buflen_0 = 0;
 	state->buflen_1 = 0;
 
@@ -1798,6 +1799,29 @@ struct caam_hash_template {
 /* ahash descriptors */
 static struct caam_hash_template driver_hash[] = {
 	{
+		.name = "md5",
+		.driver_name = "md5-caam",
+		.hmac_name = "hmac(md5)",
+		.hmac_driver_name = "hmac-md5-caam",
+		.blocksize = MD5_BLOCK_WORDS * 4,
+		.template_ahash = {
+			.init = ahash_init,
+			.update = ahash_update,
+			.final = ahash_final,
+			.finup = ahash_finup,
+			.digest = ahash_digest,
+			.export = ahash_export,
+			.import = ahash_import,
+			.setkey = ahash_setkey,
+			.halg = {
+				.digestsize = MD5_DIGEST_SIZE,
+				.statesize = sizeof(struct caam_hash_ctx) + \
+					     sizeof(struct caam_hash_state),
+				},
+			},
+		.alg_type = OP_ALG_ALGSEL_MD5,
+		.alg_op = OP_ALG_ALGSEL_MD5 | OP_ALG_AAI_HMAC,
+	}, {
 		.name = "sha1",
 		.driver_name = "sha1-caam",
 		.hmac_name = "hmac(sha1)",
@@ -1814,6 +1838,8 @@ static struct caam_hash_template driver_hash[] = {
 			.setkey = ahash_setkey,
 			.halg = {
 				.digestsize = SHA1_DIGEST_SIZE,
+				.statesize = sizeof(struct caam_hash_ctx) + \
+					     sizeof(struct caam_hash_state),
 				},
 			},
 		.alg_type = OP_ALG_ALGSEL_SHA1,
@@ -1835,6 +1861,8 @@ static struct caam_hash_template driver_hash[] = {
 			.setkey = ahash_setkey,
 			.halg = {
 				.digestsize = SHA224_DIGEST_SIZE,
+				.statesize = sizeof(struct caam_hash_ctx) + \
+					     sizeof(struct caam_hash_state),
 				},
 			},
 		.alg_type = OP_ALG_ALGSEL_SHA224,
@@ -1856,6 +1884,8 @@ static struct caam_hash_template driver_hash[] = {
 			.setkey = ahash_setkey,
 			.halg = {
 				.digestsize = SHA256_DIGEST_SIZE,
+				.statesize = sizeof(struct caam_hash_ctx) + \
+					     sizeof(struct caam_hash_state),
 				},
 			},
 		.alg_type = OP_ALG_ALGSEL_SHA256,
@@ -1877,6 +1907,8 @@ static struct caam_hash_template driver_hash[] = {
 			.setkey = ahash_setkey,
 			.halg = {
 				.digestsize = SHA384_DIGEST_SIZE,
+				.statesize = sizeof(struct caam_hash_ctx) + \
+					     sizeof(struct caam_hash_state),
 				},
 			},
 		.alg_type = OP_ALG_ALGSEL_SHA384,
@@ -1898,33 +1930,13 @@ static struct caam_hash_template driver_hash[] = {
 			.setkey = ahash_setkey,
 			.halg = {
 				.digestsize = SHA512_DIGEST_SIZE,
+				.statesize = sizeof(struct caam_hash_ctx) + \
+					     sizeof(struct caam_hash_state),
 				},
 			},
 		.alg_type = OP_ALG_ALGSEL_SHA512,
 		.alg_op = OP_ALG_ALGSEL_SHA512 | OP_ALG_AAI_HMAC,
 	}, {
-		.name = "md5",
-		.driver_name = "md5-caam",
-		.hmac_name = "hmac(md5)",
-		.hmac_driver_name = "hmac-md5-caam",
-		.blocksize = MD5_BLOCK_WORDS * 4,
-		.template_ahash = {
-			.init = ahash_init,
-			.update = ahash_update,
-			.final = ahash_final,
-			.finup = ahash_finup,
-			.digest = ahash_digest,
-			.export = ahash_export,
-			.import = ahash_import,
-			.setkey = ahash_setkey,
-			.halg = {
-				.digestsize = MD5_DIGEST_SIZE,
-				},
-			},
-		.alg_type = OP_ALG_ALGSEL_MD5,
-		.alg_op = OP_ALG_ALGSEL_MD5 | OP_ALG_AAI_HMAC,
-	},
-	 {
 		.name = "xcbc(aes)",
 		.driver_name = "xcbc-aes-caam",
 		.hmac_name = "xcbc(aes)",
@@ -1941,6 +1953,8 @@ static struct caam_hash_template driver_hash[] = {
 			.setkey = axcbc_setkey,
 			.halg = {
 				.digestsize = XCBC_MAC_DIGEST_SIZE,
+				.statesize = sizeof(struct caam_hash_ctx) + \
+					     sizeof(struct caam_hash_state),
 				},
 			},
 		.alg_type = OP_ALG_ALGSEL_AES | OP_ALG_AAI_XCBC_MAC,

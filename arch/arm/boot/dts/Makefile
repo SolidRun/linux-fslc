@@ -171,6 +171,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
 	imx6dl-sbc-fx6m.dtb \
 	imx6dl-wandboard.dtb \
 	imx6q-arm2.dtb \
+	imx6q-auvidea.dtb \
 	imx6q-cm-fx6.dtb \
 	imx6q-cubox-i.dtb \
 	imx6q-hummingboard.dtb \
