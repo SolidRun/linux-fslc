@@ -589,7 +589,7 @@ static int shash_prepare_alg(struct shash_alg *alg)
 
 	if (alg->digestsize > PAGE_SIZE / 8 ||
 	    alg->descsize > PAGE_SIZE / 8 ||
-	    alg->statesize > PAGE_SIZE / 2 ||
+	    alg->statesize > PAGE_SIZE / 8 ||
 	    alg->statesize == 0)
 		return -EINVAL;
 

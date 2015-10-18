@@ -493,6 +493,7 @@
 };
 
 &ssi1 {
+	compatible = "fsl,imx6q-ssi", "fsl,imx51-ssi", "fsl,imx21-ssi";
 	fsl,mode = "ac97-slave";
 	pinctrl-names = "default", "ac97-running", "ac97-reset", "ac97-warm-reset";
 	pinctrl-0 = <&ac97link_running>;
