@@ -2336,23 +2336,11 @@ gckEVENT_Notify(
                                "gcvHAL_SIGNAL: 0x%x",
                                signal);
 
-                /* Set signal. */
-                if (gcmUINT64_TO_PTR(record->info.u.Signal.process) == gcvNULL)
-                {
-                    /* Kernel signal. */
-                    gcmkERR_BREAK(
-                        gckOS_Signal(Event->os,
+                /* User signal. */
+                gcmkERR_BREAK(
+                    gckOS_UserSignal(Event->os,
                                      signal,
-                                     gcvTRUE));
-                }
-                else
-                {
-                    /* User signal. */
-                    gcmkERR_BREAK(
-                        gckOS_UserSignal(Event->os,
-                                         signal,
-                                         gcmUINT64_TO_PTR(record->info.u.Signal.process)));
-                }
+                                     gcmUINT64_TO_PTR(record->info.u.Signal.process)));
 
                 gcmkASSERT(record->info.u.Signal.auxSignal == 0);
                 break;

@@ -105,4 +105,7 @@ int mxc_edid_read(struct i2c_adapter *adp, unsigned short addr,
 	unsigned char *edid, struct mxc_edid_cfg *cfg, struct fb_info *fbi);
 int mxc_edid_parse_ext_blk(unsigned char *edid, struct mxc_edid_cfg *cfg,
 	struct fb_monspecs *specs);
+const struct fb_videomode *mxc_fb_find_nearest_mode(const struct fb_videomode *mode,
+                                                    struct list_head *head, bool relax);
+int mxc_fb_mode_is_equal_res(const struct fb_videomode *mode1, const struct fb_videomode *mode2);
 #endif
