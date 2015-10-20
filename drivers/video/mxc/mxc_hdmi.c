@@ -2043,7 +2043,7 @@ static void mxc_hdmi_set_mode(struct mxc_hdmi *hdmi, int edid_status)
 	} else {
 		fb_var_to_videomode(&m, &var);
 		dump_fb_videomode(&m);
-		mode = fb_find_nearest_mode(&m, &hdmi->fbi->modelist);
+		mode = mxc_fb_find_nearest_mode(&m, &hdmi->fbi->modelist, false);
 	}
 
 	if (!mode) {
@@ -2364,7 +2364,7 @@ static void mxc_hdmi_setup(struct mxc_hdmi *hdmi, unsigned long event)
 		else
 			memset(&hdmi->prev_virtual, 0, sizeof(hdmi->prev_virtual));
 		if (!list_empty(&hdmi->fbi->modelist)) {
-			edid_mode = fb_find_nearest_mode(&m, &hdmi->fbi->modelist);
+			edid_mode = mxc_fb_find_nearest_mode(&m, &hdmi->fbi->modelist, false);
 			pr_debug("edid mode ");
 			/* update fbi mode */
 			hdmi->fbi->mode = (struct fb_videomode *)edid_mode;
