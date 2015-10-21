@@ -1003,7 +1003,7 @@ int fb_add_videomode(const struct fb_videomode *mode, struct list_head *head)
 		modelist->mode = *mode;
 		list_add(&modelist->list, head);
 	}
-	return 0;
+	return found;
 }
 
 /**
@@ -1060,7 +1060,7 @@ void fb_videomode_to_modelist(const struct fb_videomode *modedb, int num,
 	INIT_LIST_HEAD(head);
 
 	for (i = 0; i < num; i++) {
-		if (fb_add_videomode(&modedb[i], head))
+		if (fb_add_videomode(&modedb[i], head) < 0)
 			return;
 	}
 }

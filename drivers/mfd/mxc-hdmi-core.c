@@ -27,6 +27,7 @@
 #include <linux/spinlock.h>
 #include <linux/irq.h>
 #include <linux/interrupt.h>
+#include <linux/gcd.h>
 
 #include <linux/platform_device.h>
 #include <linux/regulator/machine.h>
@@ -45,6 +46,17 @@ struct mxc_hdmi_data {
 	unsigned long __iomem *reg_base;
 	unsigned long reg_phys_base;
 	struct device *dev;
+};
+
+struct mxc_hdmi_ctsn_t {
+	int freq;
+	int n;
+	int cts;
+};
+
+struct mxc_hdmi_ctsn {
+	int pixclk;
+	struct mxc_hdmi_ctsn_t ctsn[3];
 };
 
 static void __iomem *hdmi_base;
@@ -371,166 +383,118 @@ static void hdmi_set_clock_regenerator_cts(unsigned int cts)
 		    HDMI_AUD_CTS3_CTS_MANUAL, HDMI_AUD_CTS3);
 }
 
-static unsigned int hdmi_compute_n(unsigned int freq, unsigned long pixel_clk,
-				   unsigned int ratio)
+static const struct mxc_hdmi_ctsn mxc_hdmi_ctsn_tbl[] = {
+	/*		 32kHz			  44.1kHz		    48kHz    */
+	/* Clock                  N     CTS                N     CTS                 N     CTS */
+	{ 25175, { { 32000, 4096,  25175 }, { 44100, 28224, 125875 }, { 48000,  6144,  25175 } } }, /*  25,20/1.001 MHz */
+	{ 25200, { { 32000, 4096,  25200 }, { 44100,  6272,  28000 }, { 48000,  6144,  25200 } } }, /*  25.20       MHz */
+	{ 27000, { { 32000, 4096,  27000 }, { 44100,  6272,  30000 }, { 48000,  6144,  27000 } } }, /*  27.00       MHz */
+	{ 27027, { { 32000, 4096,  27027 }, { 44100,  6272,  30030 }, { 48000,  6144,  27027 } } }, /*  27.00*1.001 MHz */
+	{ 54000, { { 32000, 4096,  54000 }, { 44100,  6272,  60000 }, { 48000,  6144,  54000 } } }, /*  54.00       MHz */
+	{ 54054, { { 32000, 4096,  54054 }, { 44100,  6272,  60060 }, { 48000,  6144,  54054 } } }, /*  54.00*1.001 MHz */
+	{ 74176, { { 32000, 4096,  74176 }, { 44100,  5733,  75335 }, { 48000,  6144,  74176 } } }, /*  74.25/1.001 MHz */
+	{ 74250, { { 32000, 4096,  74250 }, { 44100,  6272,  82500 }, { 48000,  6144,  74250 } } }, /*  74.25       MHz */
+	{148352, { { 32000, 4096, 148352 }, { 44100,  5733, 150670 }, { 48000,  6144, 148352 } } }, /* 148.50/1.001 MHz */
+	{148500, { { 32000, 4096, 148500 }, { 44100,  6272, 165000 }, { 48000,  6144, 148500 } } }, /* 148.50       MHz */
+};
+
+static bool hdmi_compute_cts_n(unsigned int freq, unsigned long pixel_clk,
+				   unsigned int *N, unsigned int *CTS)
 {
-	unsigned int n = (128 * freq) / 1000;
+	int n, cts;
+	unsigned long div, mul;
 
-	switch (freq) {
-	case 32000:
-		if (pixel_clk == 25174000)
-			n = (ratio == 150) ? 9152 : 4576;
-		else if (pixel_clk == 27020000)
-			n = (ratio == 150) ? 8192 : 4096;
-		else if (pixel_clk == 74170000 || pixel_clk == 148350000)
-			n = 11648;
-		else if (pixel_clk == 297000000)
-			n = (ratio == 150) ? 6144 : 3072;
-		else
-			n = 4096;
-		break;
+	/* Safe, but overly large values */
+	n = 128 * freq;
+	cts = pixel_clk;
 
-	case 44100:
-		if (pixel_clk == 25174000)
-			n = 7007;
-		else if (pixel_clk == 74170000)
-			n = 17836;
-		else if (pixel_clk == 148350000)
-			n = (ratio == 150) ? 17836 : 8918;
-		else if (pixel_clk == 297000000)
-			n = (ratio == 150) ? 9408 : 4704;
-		else
-			n = 6272;
-		break;
+	/* Smallest valid fraction */
+	div = gcd(n, cts);
 
-	case 48000:
-		if (pixel_clk == 25174000)
-			n = (ratio == 150) ? 9152 : 6864;
-		else if (pixel_clk == 27020000)
-			n = (ratio == 150) ? 8192 : 6144;
-		else if (pixel_clk == 74170000)
-			n = 11648;
-		else if (pixel_clk == 148350000)
-			n = (ratio == 150) ? 11648 : 5824;
-		else if (pixel_clk == 297000000)
-			n = (ratio == 150) ? 10240 : 5120;
-		else
-			n = 6144;
-		break;
+	n /= div;
+	cts /= div;
 
-	case 88200:
-		n = hdmi_compute_n(44100, pixel_clk, ratio) * 2;
-		break;
+	/*
+	 * The optimal N is 128*freq/1000. Calculate the closest larger
+	 * value that doesn't truncate any bits.
+	 */
+	mul = ((128*freq/1000) + (n-1))/n;
 
-	case 96000:
-		n = hdmi_compute_n(48000, pixel_clk, ratio) * 2;
-		break;
+	n *= mul;
+	cts *= mul;
 
-	case 176400:
-		n = hdmi_compute_n(44100, pixel_clk, ratio) * 4;
-		break;
-
-	case 192000:
-		n = hdmi_compute_n(48000, pixel_clk, ratio) * 4;
-		break;
-
-	default:
-		break;
+	/* Check that we are in spec (not always possible) */
+	if (n < (128*freq/1500)) {
+		pr_warn("%s: calculated ACR N value is too small. Audio will be disabled.\n", __func__);
+		return false;
+	}
+	if (n > (128*freq/300)) {
+		pr_warn("%s: calculated ACR N value is too large. Audio will be disabled.\n", __func__);
+		return false;
 	}
 
-	return n;
+	*N = n;
+	*CTS = cts;
+	return true;
 }
 
-static unsigned int hdmi_compute_cts(unsigned int freq, unsigned long pixel_clk,
-				     unsigned int ratio)
+static void hdmi_lookup_cts_n(unsigned int freq, unsigned long pixel_clk,
+				   unsigned int *n, unsigned int *cts)
 {
-	unsigned int cts = 0;
-	switch (freq) {
-	case 32000:
-		if (pixel_clk == 297000000) {
-			cts = 222750;
-			break;
-		} else if (pixel_clk == 25174000) {
-			cts = 28125;
-			break;
-		}
-	case 48000:
-	case 96000:
-	case 192000:
-		switch (pixel_clk) {
-		case 25200000:
-		case 27000000:
-		case 54000000:
-		case 74250000:
-		case 148500000:
-			cts = pixel_clk / 1000;
-			break;
-		case 297000000:
-			cts = 247500;
-			break;
-		case 25174000:
-			cts = 28125l;
-			break;
-		/*
-		 * All other TMDS clocks are not supported by
-		 * DWC_hdmi_tx. The TMDS clocks divided or
-		 * multiplied by 1,001 coefficients are not
-		 * supported.
-		 */
-		default:
-			break;
-		}
-		break;
-	case 44100:
+	unsigned int clk = pixel_clk / 1000;
+	unsigned int frq = freq;
+	int i, j;
+
+	*n = 1;
+	switch (frq) {
 	case 88200:
+		frq = 44100;
+		*n = 2;
+		break;
+	case 96000:
+		frq = 48000;
+		*n = 2;
+		break;
 	case 176400:
-		switch (pixel_clk) {
-		case 25200000:
-			cts = 28000;
-			break;
-		case 25174000:
-			cts = 31250;
-			break;
-		case 27000000:
-			cts = 30000;
-			break;
-		case 54000000:
-			cts = 60000;
-			break;
-		case 74250000:
-			cts = 82500;
-			break;
-		case 148500000:
-			cts = 165000;
-			break;
-		case 297000000:
-			cts = 247500;
-			break;
-		default:
-			break;
-		}
+		frq = 44100;
+		*n = 4;
+		break;
+	case 192000:
+		frq = 48000;
+		*n = 4;
 		break;
 	default:
 		break;
 	}
-	if (ratio == 100)
-		return cts;
-	else
-		return (cts * ratio) / 100;
+
+	for (i = 0; i < ARRAY_SIZE(mxc_hdmi_ctsn_tbl); i++) {
+		if (mxc_hdmi_ctsn_tbl[i].pixclk == clk) {
+			for (j = 0; j < 3; j++) {
+				if (mxc_hdmi_ctsn_tbl[i].ctsn[j].freq == frq) {
+					*n *= mxc_hdmi_ctsn_tbl[i].ctsn[j].n;
+					*cts = mxc_hdmi_ctsn_tbl[i].ctsn[j].cts;
+					return;
+				}
+			}
+		}
+	}
 }
 
 static void hdmi_set_clk_regenerator(void)
 {
-	unsigned int clk_n, clk_cts;
+	unsigned int clk_n, clk_cts = 0;
 
-	clk_n = hdmi_compute_n(sample_rate, pixel_clk_rate, hdmi_ratio);
-	clk_cts = hdmi_compute_cts(sample_rate, pixel_clk_rate, hdmi_ratio);
+	hdmi_lookup_cts_n(sample_rate, pixel_clk_rate, &clk_n, &clk_cts);
 
-	if (clk_cts == 0) {
-		pr_debug("%s: pixel clock not supported: %d\n",
-			__func__, (int)pixel_clk_rate);
+	if (clk_cts == 0 && hdmi_compute_cts_n(sample_rate, pixel_clk_rate, &clk_n, &clk_cts))
+		pr_debug("%s: pixel clock not supported - using fallback calculation.\n", __func__);
+	else if (clk_cts == 0) {
+		mxc_hdmi_abort_stream();
 		return;
 	}
+
+	if (hdmi_ratio != 100)
+		clk_cts = (clk_cts * hdmi_ratio) / 100;
 
 	pr_debug("%s: samplerate=%d  ratio=%d  pixelclk=%d  N=%d  cts=%d\n",
 		__func__, sample_rate, hdmi_ratio, (int)pixel_clk_rate,
@@ -574,13 +538,11 @@ void hdmi_init_clk_regenerator(void)
 }
 EXPORT_SYMBOL(hdmi_init_clk_regenerator);
 
-void hdmi_clk_regenerator_update_pixel_clock(u32 pixclock)
+void hdmi_clk_regenerator_update_pixel_clock(u32 pixclock, u32 vmode)
 {
 
-	if (!pixclock)
-		return;
 	/* Translate pixel clock in ps (pico seconds) to Hz  */
-	pixel_clk_rate = PICOS2KHZ(pixclock) * 1000UL;
+	pixel_clk_rate = mxcPICOS2KHZ(pixclock, vmode) * 1000UL;
 	hdmi_set_clk_regenerator();
 }
 EXPORT_SYMBOL(hdmi_clk_regenerator_update_pixel_clock);

@@ -1032,12 +1032,13 @@ fb_set_var(struct fb_info *info, struct fb_var_screeninfo *var)
 			    !list_empty(&info->modelist))
 				ret = fb_add_videomode(&mode, &info->modelist);
 
-			if (!ret && (flags & FBINFO_MISC_USEREVENT)) {
+			if (!(ret < 0) && (flags & FBINFO_MISC_USEREVENT)) {
 				struct fb_event event;
 				int evnt = (activate & FB_ACTIVATE_ALL) ?
 					FB_EVENT_MODE_CHANGE_ALL :
 					FB_EVENT_MODE_CHANGE;
 
+				ret = 0;
 				info->flags &= ~FBINFO_MISC_USEREVENT;
 				event.info = info;
 				event.data = &mode;

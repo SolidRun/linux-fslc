@@ -99,6 +99,11 @@ struct mxc_edid_cfg {
 	u8 speaker_alloc;
 };
 
+static inline unsigned long mxcPICOS2KHZ(u32 pixclock, u32 vmode) {
+	u32 x = (1000000000UL / (pixclock) * 1000 / ((vmode & FB_VMODE_FRACTIONAL) ? 1001 : 1000));
+	return x + ((1000000000UL % x) > (x / 2) ? 1 : 0);
+}
+
 int mxc_edid_var_to_vic(struct fb_var_screeninfo *var);
 int mxc_edid_mode_to_vic(const struct fb_videomode *mode);
 int mxc_edid_read(struct i2c_adapter *adp, unsigned short addr,

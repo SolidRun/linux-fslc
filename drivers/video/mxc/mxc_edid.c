@@ -192,8 +192,7 @@ const struct fb_videomode mxc_cea_mode[64] = {
 	},
 };
 
-/* 0x8 is FB_VMODE_FRACT (not yet merged) */
-#define FB_VMODE_MASK_SIMPLE (FB_VMODE_NONINTERLACED | FB_VMODE_INTERLACED | 0x8)
+#define FB_VMODE_MASK_SIMPLE (FB_VMODE_NONINTERLACED | FB_VMODE_INTERLACED | FB_VMODE_FRACTIONAL)
 
 int mxc_fb_mode_is_equal_res(const struct fb_videomode *mode1,
 			     const struct fb_videomode *mode2)
