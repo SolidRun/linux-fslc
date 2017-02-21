@@ -254,9 +254,10 @@
 				vsync-len = <2>;
 			};
 			
-			timing2: 1366x768 {	// 15.6" display
+			// IPU needs X and Y by modulo 8
+			timing2: 1360x768 {	// 15.6" display
 				clock-frequency = <76000000>;
-				hactive = <1366>;
+				hactive = <1360>;
 				vactive = <768>;
 				hback-porch = <220>;
 				hfront-porch = <40>;
