@@ -74,11 +74,8 @@
 				 HDMI_IH_CEC_STAT0_DONE)
 
 #define	CEC_STAT0_MASK_DEFAULT	(HDMI_IH_CEC_STAT0_WAKEUP | \
-				 HDMI_IH_CEC_STAT0_ERROR_FOLL)
-
-#define	CEC_CTRL_SEND_RETRY	0x01
-#define	CEC_CTRL_SEND_FIRST	0x03
-#define	CEC_CTRL_SEND_NEXT	0x05
+				 HDMI_IH_CEC_STAT0_ERROR_FOLL | \
+				 HDMI_IH_CEC_STAT0_ARB_LOST)
 
 struct hdmi_cec_priv {
 	int receive_error;
@@ -89,7 +86,6 @@ struct hdmi_cec_priv {
 	u8 is_started;
 	u8 link_status;
 	u8 open_count;
-	u8 send_next;
 	spinlock_t irq_lock;
 	struct work_struct hdmi_cec_work;
 	struct mutex lock;
@@ -245,10 +241,7 @@ static void mxc_hdmi_cec_handle(struct hdmi_cec_priv *priv, u32 cec_stat)
 	}
 
 	/*The current transmission is successful (for initiator only).*/
-	/*An error is detected on cec line (for initiator only). */
-	/*Another initiator has taken over the bus. */
-	if (cec_stat & (HDMI_IH_CEC_STAT0_DONE |
-			HDMI_IH_CEC_STAT0_ERROR_INIT | HDMI_IH_CEC_STAT0_ARB_LOST)) {
+	if (cec_stat & HDMI_IH_CEC_STAT0_DONE) {
 		priv->tx_answer = cec_stat;
 		wake_up(&tx_queue);
 	}
@@ -277,16 +270,16 @@ static void mxc_hdmi_cec_handle(struct hdmi_cec_priv *priv, u32 cec_stat)
 		list_add_tail(&event->list, &ev_pending);
 		mutex_unlock(&priv->lock);
 
-		priv->send_next = 0;
 		wake_up(&rx_queue);
 	}
 
+	/*An error is detected on cec line (for initiator only). */
 	/*A frame is not acknowledged in a directly addressed message. Or a frame is negatively acknowledged in
 	a broadcast message (for initiator only).*/
-	if (cec_stat & HDMI_IH_CEC_STAT0_NACK) {
+	if (cec_stat & (HDMI_IH_CEC_STAT0_ERROR_INIT | HDMI_IH_CEC_STAT0_NACK)) {
 		if (++priv->send_error < CEC_TX_RETRIES) {
 			val = hdmi_readb(HDMI_CEC_CTRL) & ~0x07;
-			hdmi_writeb(val | CEC_CTRL_SEND_RETRY, HDMI_CEC_CTRL);
+			hdmi_writeb(val | 0x01, HDMI_CEC_CTRL);
 		} else {
 			priv->tx_answer = cec_stat;
 			wake_up(&tx_queue);
@@ -375,7 +368,7 @@ void hdmi_cec_start_device(void)
 	hdmi_writeb(0x0, HDMI_CEC_LOCK);
 
 	val = HDMI_IH_CEC_STAT0_ERROR_INIT | HDMI_IH_CEC_STAT0_NACK |
-	      HDMI_IH_CEC_STAT0_EOM | HDMI_IH_CEC_STAT0_DONE | HDMI_IH_CEC_STAT0_ARB_LOST;
+	      HDMI_IH_CEC_STAT0_EOM | HDMI_IH_CEC_STAT0_DONE;
 	hdmi_writeb(val, HDMI_CEC_POLARITY);
 
 	val = CEC_STAT0_MASK_DEFAULT;
@@ -531,14 +524,8 @@ static ssize_t hdmi_cec_write(struct file *file, const char __user *buf,
 	hdmi_writeb(msg_len, HDMI_CEC_TX_CNT);
 	for (i = 0; i < msg_len; i++)
 		hdmi_writeb(msg[i], HDMI_CEC_TX_DATA0 + i);
-
 	val = hdmi_readb(HDMI_CEC_CTRL) & ~0x07;
-	if (priv->send_next)
-		hdmi_writeb(val | CEC_CTRL_SEND_NEXT, HDMI_CEC_CTRL);
-	else
-		hdmi_writeb(val | CEC_CTRL_SEND_FIRST, HDMI_CEC_CTRL);
-
-	priv->send_next = 1;
+	hdmi_writeb(val | 0x03, HDMI_CEC_CTRL);
 
 	mutex_unlock(&priv->lock);
 
