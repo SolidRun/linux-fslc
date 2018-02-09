@@ -1170,24 +1170,23 @@ static const struct regmap_config fsl_spdif_regmap_config = {
 
 static u32 fsl_spdif_txclk_caldiv(struct fsl_spdif_priv *spdif_priv,
 				struct clk *clk, u64 savesub,
-				enum spdif_txrate index, bool round)
+				enum spdif_txrate index)
 {
 	const u32 rate[] = { 32000, 44100, 48000, 88200, 96000, 176400, 192000 };
 	bool is_sysclk = clk_is_match(clk, spdif_priv->sysclk);
-	u64 rate_actual, sub;
+	u64 sub;
 	u32 sysclk_dfmin, sysclk_dfmax;
-	u32 txclk_df, sysclk_df, arate;
+	u32 txclk_df, sysclk_df, arate, base_rate;
 
 	/* The sysclk has an extra divisor [2, 512] */
 	sysclk_dfmin = is_sysclk ? 2 : 1;
 	sysclk_dfmax = is_sysclk ? 512 : 1;
 
+	base_rate = clk_get_rate(clk) / 64;
+
 	for (sysclk_df = sysclk_dfmin; sysclk_df <= sysclk_dfmax; sysclk_df++) {
 		for (txclk_df = 1; txclk_df <= 128; txclk_df++) {
-			rate_actual = clk_get_rate(clk);
-
-			arate = rate_actual / 64;
-			arate /= txclk_df * sysclk_df;
+			arate = base_rate / (txclk_df * sysclk_df);
 
 			if (arate == rate[index]) {
 				/* We are lucky */
@@ -1245,8 +1244,7 @@ static int fsl_spdif_probe_txclk(struct fsl_spdif_priv *spdif_priv,
 		if (!clk_get_rate(clk))
 			continue;
 
-		ret = fsl_spdif_txclk_caldiv(spdif_priv, clk, savesub, index,
-					     i == STC_TXCLK_SPDIF_ROOT);
+		ret = fsl_spdif_txclk_caldiv(spdif_priv, clk, savesub, index);
 		if (savesub == ret)
 			continue;
 
