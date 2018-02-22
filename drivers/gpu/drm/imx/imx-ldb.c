@@ -443,7 +443,7 @@ static int imx_ldb_get_clk(struct imx_ldb *ldb, int chno)
 {
 	char clkname[16];
 
-	snprintf(clkname, sizeof(clkname), "di%d", chno);
+	snprintf(clkname, sizeof(clkname), "ldb_di%d", chno);
 	ldb->clk[chno] = devm_clk_get(ldb->dev, clkname);
 	if (IS_ERR(ldb->clk[chno]))
 		return PTR_ERR(ldb->clk[chno]);
