@@ -2411,22 +2411,26 @@ static irqreturn_t task_irq_handler(int irq, void *dev_id)
 static void vdi_split_process(struct ipu_soc *ipu, struct ipu_task_entry *t)
 {
 	u32 vdi_size;
-	u32 vdi_save_lines;
+	s32 vdi_save_lines;
 	u32 stripe_mode;
-	u32 task_no;
 	u32 i, offset_addr;
 	u32 line_size;
 	unsigned char  *base_off;
 	struct ipu_task_entry *parent = t->parent;
-	struct mutex *lock = &parent->vdic_lock;
+	struct mutex *lock;
 
 	if (!parent) {
 		dev_err(t->dev, "ERR[0x%x]invalid parent\n", t->task_no);
 		return;
 	}
-	mutex_lock(lock);
-	stripe_mode = t->task_no & 0xf;
-	task_no = t->task_no >> 4;
+
+	vdi_save_lines = (t->output.crop.h - t->set.sp_setting.ud_split_line)/2;
+	if (vdi_save_lines == 0)
+		return;
+	if (vdi_save_lines < 0) {
+		dev_err(t->dev, "[0x%p] vdi_save_line error\n", (void *)t);
+		return;
+	}
 
 	/* Save both luma and chroma part for interleaved YUV(e.g. YUYV).
 	 * Save luma part for non-interleaved and partial-interleaved
@@ -2436,14 +2440,11 @@ static void vdi_split_process(struct ipu_soc *ipu, struct ipu_task_entry *t)
 		line_size = t->output.crop.w * fmt_to_bpp(t->output.format)/8;
 	else
 		line_size = t->output.crop.w;
-
-	vdi_save_lines = (t->output.crop.h - t->set.sp_setting.ud_split_line)/2;
 	vdi_size = vdi_save_lines * line_size;
-	if (vdi_save_lines <= 0) {
-		dev_err(t->dev, "[0x%p] vdi_save_line error\n", (void *)t);
-		mutex_unlock(lock);
-		return;
-	}
+
+	lock = &parent->vdic_lock;
+	mutex_lock(lock);
+	stripe_mode = t->task_no & SPLIT_MASK;
 
 	/*check vditmpbuf buffer have alloced or buffer size is changed */
 	if ((vdi_save_lines != parent->old_save_lines) ||
