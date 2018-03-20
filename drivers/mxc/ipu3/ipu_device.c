@@ -2449,28 +2449,18 @@ static void vdi_split_process(struct ipu_soc *ipu, struct ipu_task_entry *t)
 	/*check vditmpbuf buffer have alloced or buffer size is changed */
 	if ((vdi_save_lines != parent->old_save_lines) ||
 		(vdi_size != parent->old_size)) {
-		if (parent->vditmpbuf[0] != NULL)
-			kfree(parent->vditmpbuf[0]);
-		if (parent->vditmpbuf[1] != NULL)
-			kfree(parent->vditmpbuf[1]);
 
-		parent->vditmpbuf[0] = kmalloc(vdi_size, GFP_KERNEL);
+		kfree(parent->vditmpbuf[0]);
+		parent->vditmpbuf[0] = kzalloc(2 * vdi_size, GFP_KERNEL);
 		if (parent->vditmpbuf[0] == NULL) {
 			dev_err(t->dev,
-				"[0x%p]Falied Alloc vditmpbuf[0]\n", (void *)t);
+				"[0x%p] Failed Alloc vditmpbuf\n", (void *)t);
+			parent->old_save_lines = parent->old_size = 0;
+			parent->vditmpbuf[1] = NULL;
 			mutex_unlock(lock);
 			return;
 		}
-		memset(parent->vditmpbuf[0], 0, vdi_size);
-
-		parent->vditmpbuf[1] = kmalloc(vdi_size, GFP_KERNEL);
-		if (parent->vditmpbuf[1] == NULL) {
-			dev_err(t->dev,
-				"[0x%p]Falied Alloc vditmpbuf[1]\n", (void *)t);
-			mutex_unlock(lock);
-			return;
-		}
-		memset(parent->vditmpbuf[1], 0, vdi_size);
+		parent->vditmpbuf[1] = parent->vditmpbuf[0] + vdi_size;
 
 		parent->old_save_lines = vdi_save_lines;
 		parent->old_size = vdi_size;
@@ -3182,7 +3172,7 @@ out:
 	}
 
 	kfree(parent->vditmpbuf[0]);
-	kfree(parent->vditmpbuf[1]);
+	parent->vditmpbuf[0] = parent->vditmpbuf[1] = NULL;
 
 	if (ret < 0)
 		parent->state = STATE_TIMEOUT;
