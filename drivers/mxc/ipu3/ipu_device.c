@@ -2488,6 +2488,8 @@ static void vdi_split_process(struct ipu_soc *ipu, struct ipu_task_entry *t)
 		filled  = parent->buf0filled++;
 	}
 
+	vdi_size = vdi_save_lines * t->set.ostride;
+
 	if (stripe_mode & UP_STRIPE) {
 		if ((filled & 1) == 0) {
 			offset_addr = t->set.o_off +
@@ -2509,9 +2511,9 @@ static void vdi_split_process(struct ipu_soc *ipu, struct ipu_task_entry *t)
 						tmp_buf + i*line_size, line_size);
 
 			dmac_flush_range(base_off + offset_addr,
-					base_off + offset_addr + i*t->set.ostride);
+					base_off + offset_addr + vdi_size);
 			outer_flush_range(t->output.paddr + offset_addr,
-					t->output.paddr + offset_addr + i*t->set.ostride);
+					t->output.paddr + offset_addr + vdi_size);
 		}
 	} else {
 		if ((filled & 1) == 0) {
@@ -2533,9 +2535,9 @@ static void vdi_split_process(struct ipu_soc *ipu, struct ipu_task_entry *t)
 						line_size);
 
 			dmac_flush_range(base_off + offset_addr,
-					base_off + offset_addr + i*t->set.ostride);
+					base_off + offset_addr + vdi_size);
 			outer_flush_range(t->output.paddr + offset_addr,
-					t->output.paddr + offset_addr + i*t->set.ostride);
+					t->output.paddr + offset_addr + vdi_size);
 		}
 	}
 
