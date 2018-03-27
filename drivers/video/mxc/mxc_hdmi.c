@@ -2038,8 +2038,10 @@ static void mxc_hdmi_set_mode(struct mxc_hdmi *hdmi, int edid_status)
 	if (edid_status == HDMI_EDID_SUCCESS && !hdmi->prev_virtual.xres_virtual) {
 		dev_dbg(&hdmi->pdev->dev,
 				"xBuffer not active, trying new best display mode\n");
-		if ((mode = fb_find_best_display(&hdmi->fbi->monspecs, &hdmi->fbi->modelist)))
+		if ((mode = fb_find_best_display(&hdmi->fbi->monspecs, &hdmi->fbi->modelist))) {
 			fb_videomode_to_var(&var, mode);
+			new_screen = true;
+		}
 	}
 
 	fb_var_to_videomode(&m, &var);
@@ -2063,7 +2065,6 @@ static void mxc_hdmi_set_mode(struct mxc_hdmi *hdmi, int edid_status)
 			memcpy(&hdmi->fbi->var.xres_virtual, &hdmi->prev_virtual, sizeof(hdmi->prev_virtual));
 	} else {
 		dev_dbg(&hdmi->pdev->dev, "%s: New video mode\n", __func__);
-		new_screen = true;
 	}
 
 	hdmi_set_cable_state(1);
