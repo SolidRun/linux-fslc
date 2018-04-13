@@ -39,6 +39,10 @@
  *     OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#ifndef MXC_USE_VENDOR_DRIVERS
+#include "imx6qdl-hummingboard-lvds.dtsi"
+#endif
+
 / {
 	chosen {
 		stdout-path = &uart1;
@@ -268,6 +272,12 @@
 			fsl,pins = <MX6QDL_PAD_DISP0_DAT8__PWM1_OUT 0x1b0b1>;
 		};
 
+		pinctrl_hummingboard_pwm3: pwm3grp {
+			fsl,pins = <
+				MX6QDL_PAD_SD4_DAT1__PWM3_OUT 0x1b0b1
+			>;
+		};
+
 		pinctrl_hummingboard_sgtl5000: hummingboard-sgtl5000 {
 			fsl,pins = <
 				MX6QDL_PAD_DISP0_DAT19__AUD5_RXD 0x130b0
@@ -361,6 +371,12 @@
 
 &pwm2 {
 	 pinctrl-names = "default";
+	 status = "okay";
+};
+
+&pwm3 {
+	 pinctrl-names = "default";
+	 pinctrl-0 = <&pinctrl_hummingboard_pwm3>;
 	 status = "okay";
 };
 

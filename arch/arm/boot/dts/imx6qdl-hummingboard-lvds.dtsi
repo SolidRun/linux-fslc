@@ -1,0 +1,75 @@
+/ {
+	panel {
+		compatible = "powertip,ph800480t024", "panel-lvds";
+		width-mm = <108>;
+		height-mm = <65>;
+		data-mapping = "jeida-18";
+		backlight = <&lvds_backlight>;
+
+		panel-timing {
+			clock-frequency = <33000000>;
+			hactive = <800>;
+			vactive = <480>;
+			hback-porch = <46>;
+			hfront-porch = <210>;
+			vback-porch = <23>;
+			vfront-porch = <22>;
+			hsync-len = <60>;
+			vsync-len = <10>;
+		};
+
+		port {
+			panel_in: endpoint {
+				remote-endpoint = <&lvds0_out>;
+			};
+		};
+	};
+
+	lvds_backlight: backlight {
+		compatible = "pwm-backlight";
+		pwms = <&pwm3 0 10000000>;
+		power-supply = <&v_3v2>;
+		brightness-levels = <0 3 6 12 16 24 32 48 64 96 128 192 255>;
+		default-brightness-level = <12>;
+	};
+};
+
+&i2c1 {
+	touchscreen@55 {
+		compatible = "sitronix,st1232";
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_hummingboard_touchscreen>;
+		reg = <0x55>;
+		interrupt-parent = <&gpio1>;
+		interrupts = <3 IRQ_TYPE_LEVEL_LOW>;
+	};
+};
+
+&iomuxc {
+	hummingboard {
+		pinctrl_hummingboard_touchscreen: hummingboard-touchscreen {
+			fsl,pins = <
+				MX6QDL_PAD_GPIO_3__GPIO1_IO03	0x1b0b0
+				MX6QDL_PAD_KEY_COL4__GPIO4_IO14	0x1b0b0
+			>;
+		};
+	};
+};
+
+&ldb {
+	status = "okay";
+
+	lvds-channel@0 {
+		fsl,data-mapping = "spwg";
+		fsl,data-width = <18>;
+		status = "okay";
+
+		port@4 {
+			reg = <4>;
+
+			lvds0_out: endpoint {
+				remote-endpoint = <&panel_in>;
+			};
+		};
+	};
+};
