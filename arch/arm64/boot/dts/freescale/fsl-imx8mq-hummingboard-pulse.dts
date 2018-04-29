@@ -114,6 +114,22 @@
 		clock-names = "mclk";
 		wlf,mute-gpios = <&gpio1 8 GPIO_ACTIVE_LOW>;
 	};
+
+	leds {
+		compatible = "gpio-leds";
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_leds>;
+
+		red {
+			gpios = <&gpio5 8 GPIO_ACTIVE_LOW>;
+			default-state = "off";
+		};
+
+		greed {
+			gpios = <&gpio5 9 GPIO_ACTIVE_LOW>;
+			default-state = "off";
+		};
+	};
 };
 
 &clk {
@@ -267,8 +283,6 @@
 			fsl,pins = <
 				MX8MQ_IOMUXC_UART3_TXD_UART3_DCE_TX		0x49
 				MX8MQ_IOMUXC_UART3_RXD_UART3_DCE_RX		0x49
-				MX8MQ_IOMUXC_ECSPI1_MISO_UART3_DCE_CTS_B	0x49
-				MX8MQ_IOMUXC_ECSPI1_SS0_UART3_DCE_RTS_B		0x49
 			>;
 		};
 
@@ -316,6 +330,13 @@
 				MX8MQ_IOMUXC_SD2_DATA2_USDHC2_DATA2		0xc7
 				MX8MQ_IOMUXC_SD2_DATA3_USDHC2_DATA3		0xc7
 				MX8MQ_IOMUXC_GPIO1_IO04_USDHC2_VSELECT		0xc1
+			>;
+		};
+
+		pinctrl_leds: ledsgrp {
+			fsl,pins = <
+				MX8MQ_IOMUXC_ECSPI1_MISO_GPIO5_IO8		0x19
+				MX8MQ_IOMUXC_ECSPI1_SS0_GPIO5_IO9		0x19
 			>;
 		};
 	};
