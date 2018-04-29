@@ -2474,7 +2474,7 @@ static void vdi_split_process(struct ipu_soc *ipu, struct ipu_task_entry *t)
 				t->output.width * t->output.height *
 				fmt_to_bpp(t->output.format)/8);
 	}
-	if (base_off == NULL) {
+	if (base_off < (u8 *)(1 << PAGE_SHIFT)) {
 		dev_err(t->dev, "ERR[0x%p]Failed get virtual address\n", t);
 		mutex_unlock(lock);
 		return;
